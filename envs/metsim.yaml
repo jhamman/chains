@@ -1,0 +1,17 @@
+name: test_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.6
+  - xarray
+  - pandas
+  - netcdf4
+  - bottleneck
+  - numba
+  - numpy
+  - scipy
+  - pytest
+  - pip:
+    - coveralls
+    - pytest-cov
+    - git+https://github.com/UW-Hydro/MetSim.git@develop

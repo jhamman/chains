@@ -1,0 +1,12 @@
+rule metsim_config:
+    input:
+        "templates/newman_metsim_template.cfg"
+    params:
+        year = '2000', ens = '001'
+    output:
+        "output.cfg"
+    run:
+        with open(input[0], 'r') as f:
+            template = f.read()
+        with open(output[0], 'w') as f:
+            f.write(template.format(year=params.year, ens=params.ens))
