@@ -1,103 +1,178 @@
-# The main entry point of your workflow.
-# After configuring, running snakemake -n in a clone of this repository should
-# successfully execute a dry-run of the workflow.
-# snakemake -j 4 --cluster-config cluster.json --cluster "qsub -l walltime={cluster.walltime} -l select={cluster.n} -A {cluster.account} -q {cluster.queue} -j oe" --use-conda
-
 import os
-
-# Configuration options (probably should move to another file)
-GCMS = ['access13', 'canesm', 'cesm', 'cnrm', 'gfdl', 'giss', 'ipsl', 'miroc5', 'mri', 'noresm']
-SCENS = ['rcp45', 'rcp85']
-HIST_YEARS = list(range(1950, 2006))
-RCP_YEARS = list(range(2006, 2100))
-icar_filename = '/glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc'
+from tools.utilities import make_case_readme
 
 
-dirs = {}
-dirs['root'] = '/glade2/scratch2/jhamman/testflow/'
-dirs['metsim'] = os.path.join(dirs['root'], 'metsim')
-dirs['config'] = os.path.join(dirs['root'], 'config')
-
-for k, d in dirs.items():
-    os.makedirs(d, exist_ok=True)
-
-metsim_prefix = 'metsim_{gcm}_{scen}_'
-metsim_fname = os.path.join(
-    dirs['metsim'], metsim_prefix + '{year}0101-{year}1231.nc'),
-
-# configfile: "config.json"
-# ------------------------------------------------------------------------------
-
-# utilities
+configfile: "/glade/u/home/jhamman/projects/storylines/storylines_workflow/config.yml"
 
 
-def metsim_run_inputs(wildcards):
-    out = {}
-    out['config'] = os.path.join(
-        dirs['config'],
-        'metsim.{wcs.gcm}.{wcs.scen}.{wcs.year}.cfg'.format(wcs=wildcards))
-    if wildcards.year == 2006:
-        out['state'] = make_metsim_statename(wildcards.gcm, 'hist',
-                                             int(wildcards.year) - 1)
-    return out
+case_dirs = ['configs', 'disagg_data', 'hydro_data', 'routing_data', 'logs']
 
 
-def make_metsim_statename(gcm, scen, year):
-    prefix = metsim_prefix.format(gcm=gcm, scen=scen) + str(year)
-    return os.path.join(dirs['metsim'], prefix + '.nc')
+def get_year_range(years):
+    return list(range(years['start'], years['stop'] + 1))
 
-# ------------------------------------------------------------------------------
 
-# rules
+def vic_forcings(wcs):
+    return [os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}', 'disagg_data',
+                         '{disagg_method}.force_{gcm}_{scen}_{dsm}_{year}0101-{year}1231.nc').format(
+                year=year, gcm=wcs.gcm, scen=wcs.scen, dsm=wcs.dsm, disagg_method='metsim')
+            for year in get_year_range(config['SCEN_YEARS'][wcs.scen])]
 
-localrules: all, metsim_pre
 
-rule all:
+def metsim_forcings(wcs):
+    if wcs.dsm == 'icar':
+        f = '/glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc'.format(gcm=wcs.gcm, scen=wcs.scen)
+    else:
+        f = os.path.join('/glade/scratch/jhamman/', 'MISSING.nc')  # placeholder
+    return f
+# Workflow bookends
+onsuccess:
+    print('Workflow finished, no error')
+
+onerror:
+    print('An error occurred')
+
+onstart:
+    print('starting now')
+
+
+# Rules
+# -----------------------------------------------------------------------------
+
+# readme / logs
+rule readme:
     input:
-        expand(metsim_fname, gcm=GCMS, scen=['hist'], year=HIST_YEARS),
-        expand(metsim_fname, gcm=GCMS, scen=SCENS, year=RCP_YEARS)
+        expand(os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                            'readme.md'),
+               gcm=config['GCMS'], scen=config['SCENARIOS'],
+               dsm=config['DOWNSCALING_METHODS'])
 
-
-rule metsim_run:
-    input:
-        unpack(metsim_run_inputs)
-    output:
-        filename = metsim_fname,
-        state = make_metsim_statename('{gcm}', '{scen}', '{year}')
-    # uncomment if you want to run metsim from this conda environment
-    # conda:
-    #     "envs/metsim.yaml"
-    shell:
-        # uncomment to debug (instead of running metsim)
-        # "touch {output.filename};"
-        # "touch {output.state};"
-        # "echo ms -v -n {input.config}"
-        "ms -n 10 {input.config}"
-
-
-rule metsim_pre:
-    input:
-        template = "templates/newman_metsim_template.cfg",
-    params:
-        gcm = '{gcm}', scen = '{scen}', year = '{year}'
-    output:
-        os.path.join(dirs['config'], 'metsim.{gcm}.{scen}.{year}.cfg')
+rule setup_casedirs:
+    output: os.path.join(os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}', 'readme.md'))
     run:
-        forcing = icar_filename.format(**params)
-        out_state = make_metsim_statename(params.gcm, params.scen, params.year)
+        case_dir = os.path.dirname(output[0])
+        for d in case_dirs:
+            os.makedirs(os.path.join(case_dir, d), exist_ok=True)
 
-        if params.year in ['1950', '2006']:
-            in_state = make_metsim_statename(params.gcm, 'hist',
+        make_case_readme(wildcards,
+                         os.path.join(case_dir, 'readme.md'),
+                         disagg_methods=config['DISAGG_METHODS'],
+                         hydro_methods=config['HYDRO_METHODS'],
+                         routing_methods=config['ROUTING_METHODS'])
+
+
+# Hydrologic Models
+rule hydrology_models:
+    input:
+        expand(os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                            'hydro_data',  '{model}_{disagg_method}_hist_{outstep}.nc'),
+              gcm=config['GCMS'], scen=config['SCENARIOS'],
+              disagg_method=config['DISAGG_METHODS'],
+              dsm=config['DOWNSCALING_METHODS'], model=config['HYDRO_METHODS'],
+              outstep=['daily', 'monthly'])
+
+
+rule config_vic:
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'configs', 'vic.global_param.{gcm}.{scen}.{dsm}.txt')
+    shell:
+        "touch {output}"
+
+
+rule run_vic:
+    input:
+        vic_forcings,
+        config = os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                              'configs',
+                              'vic.global_param.{gcm}.{scen}.{dsm}.txt')
+
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'hydro_data',  'vic_{disagg_method}_hist_daily.nc'),
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'hydro_data',  'vic_{disagg_method}_hist_monthly.nc')
+    shell:
+        "touch {output}"
+
+
+rule run_prms:
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'hydro_data',  'prms_{disagg_method}_hist_{outstep}.nc')
+    shell:
+        "touch {output}"
+
+
+rule run_fuse:
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'hydro_data',  'fuse_{disagg_method}_hist_{outstep}.nc')
+    shell:
+        "touch {output}"
+
+
+rule run_summa:
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'hydro_data',  'summa_{disagg_method}_hist_{outstep}.nc')
+    shell:
+        "touch {output}"
+
+
+# Disaggregation methods
+rule disagg_methods:
+    input:
+        [expand(os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}', 'disagg_data',
+                             '{disagg_method}.force_{gcm}_{scen}_{dsm}_{year}0101-{year}1231.nc'),
+                gcm=config['GCMS'], scen=scen,
+                dsm=config['DOWNSCALING_METHODS'],
+                disagg_method=config['DISAGG_METHODS'],
+                year=get_year_range(config['SCEN_YEARS'][scen]))
+         for scen in config['SCENARIOS']]
+
+
+rule run_metsim:
+    input:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'configs', 'metsim_{gcm}_{scen}_{dsm}_{year}.cfg'),
+        forcing = metsim_forcings
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'disagg_data',  'metsim.force_{gcm}_{scen}_{dsm}_{year}0101-{year}1231.nc')
+    shell:
+        "echo {input}; touch {output}"
+
+
+rule config_metsim:
+    input:
+        config['DISAGG']['metsim']['subdaily']['template'],
+        forcing = metsim_forcings
+    output:
+        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                     'configs', 'metsim_{gcm}_{scen}_{dsm}_{year}.cfg')
+    run:
+        data_dir = os.path.dirname(output).replace('configs', 'disagg_data')
+        out_state = os.path.join(data_dir, 'metsim.state_{gcm}_{scen}_{dsm}_{year}1231.nc')
+
+        if params.year == '2006':
+            in_state = make_metsim_statename(data_dir, 'metsim.force_{gcm}_{scen}_{dsm}.',
+                                             params.gcm, 'hist',
+                                             params.dsm,
                                              int(params.year) - 1)
         else:
-            in_state = forcing
+            in_state = input.forcing
 
-        with open(input.template, 'r') as f:
+        prefix = 'metsim.force_{gcm}_{scen}_{dsm}.'.format(**params)
+
+        with open(input, 'r') as f:
             template = f.read()
-        with open(output[0], 'w') as f:
+        with open(output.config, 'w') as f:
             f.write(template.format(year=params.year,
-                                    forcing=forcing,
-                                    metsim_dir=dirs['metsim'],
-                                    prefix=metsim_prefix.format(**params),
+                                    forcing=input.forcing,
+                                    metsim_dir=data_dir,
+                                    prefix=prefix,
                                     input_state=in_state,
                                     output_state=out_state))
+    # shell:
+    #     "touch {output}"

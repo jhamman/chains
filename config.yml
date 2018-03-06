@@ -1,0 +1,184 @@
+
+GCMS:
+  - access13
+  - canesm
+  - cesm
+  - cnrm
+  - gfdl
+  - ipsl
+  - miroc5
+  - mri
+  - noresm
+  # - giss (missing rcp85)
+SCENARIOS:
+  - hist
+  - rcp45
+  - rcp85
+DOWNSCALING_METHODS:
+  - bcsd
+  - loca
+  - icar
+  - gard  # placeholder
+DISAGG_METHODS:
+  - metsim
+HYDRO_METHODS:
+  - vic  # placeholder
+  - prms  # placeholder
+  - fuse  # placeholder
+  - summa  # placeholder
+ROUTING_METHODS:
+  - mizuroute  # placeholder
+SCEN_YEARS:
+  hist:
+    start: 2001
+    stop: 2005
+  rcp45:
+    start: 2006
+    stop: 2010
+  rcp85:
+    start: 2006
+    stop: 2010
+
+# Cluster configuration
+machine: cheyenne
+workdir: /glade/scratch/jhamman/storylines_ensemble/
+__default__:
+  account: P48500028
+  queue: share
+  walltime: '00:30:00'
+  select: '1'
+run_metsim:
+  queue: economy
+  walltime: '04:00:00'
+  select: select=1:ncpus=36:mpiprocs=36
+run_vic:
+  queue: economy
+  walltime: '04:00:00'
+  select: select=2:ncpus=36:mpiprocs=36
+
+
+# Configuration settings for each method
+DISAGG:
+  metsim:
+    daily:
+      timestep: 1440
+      template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
+      out_vars:
+        - temp
+        - prec
+        - shortwave
+        - longwave
+        - vapor_pressure
+        - rel_humid
+    subdaily:
+      timestep: 60
+      template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
+      out_vars:
+        - t_min
+        - t_max
+        - prec
+        - vapor_pressure
+        - shortwave
+        - tskc
+        - pet
+
+# A "model" is the combination of an executable, parameters, and config options
+HYDROLOGY:
+  vic_00:
+    # TODO: build executable as part of the workflow
+    executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    # TODO: collect the parameters in a common location
+    parameters: /path/to/parameters.nc
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic_00.template.cfg
+    force_timestep: 60
+  prms_00:
+    # TODO: build executable as part of the workflow
+    executable: /glade/u/home/mizukami/model/prms/bin/prmsv
+    # TODO: collect the parameters in a common location
+    parameters: /path/to/parameters.nc
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_00.template.cfg
+    force_timestep: 1440
+
+
+DOWNSCALING:
+  icar:
+    data: "/glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc"
+    gcms:  # Mapping from dataset notation to official CMIP5 notation
+      access13: ACCESS1-3
+      canesm: CanESM2
+      cesm: CCSM4
+      cnrm: CNRM-CM5
+      gfdl: GFDL-CM3
+      ipsl: IPSL-CM5A-MR
+      miroc5: MIROC5
+      mri: MRI-CGCM3
+      noresm: NorESM1-M
+  bcsd:
+    data: "/glade/u/home/jhamman/workdir/reruns/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc"
+    gcms:  # Mapping from dataset notation to official CMIP5 notation
+      - access1-0: ACCESS1-0
+      - bcc-csm1-1-m: BCC-CSM1-1-M
+      - bcc-csm1-1: BCC-CSM1-1
+      - canesm2: CanESM2
+      - ccsm4: CCSM4
+      - cesm1-bgc: CESM1-BGC
+      - cesm1-cam5: CESM1-CAM5
+      - cmcc-cm: CMCC-CM
+      - cnrm-cm5: CNRM-CM5
+      - csiro-mk3-6-0: CSIRO-Mk3.6.0
+      - fgoals-g2: FGOALS-g2
+      - fio-esm: GFDL-CM3
+      - gfdl-cm3: GFDL-CM3
+      - gfdl-esm2g: GFDL-ESM2G
+      - gfdl-esm2m: GFDL-ESM2M
+      - giss-e2-h-cc: GISS-E2-H-CC
+      - giss-e2-r-cc: GISS-E2-R-CC
+      - giss-e2-r: GISS-E2-R
+      - hadgem2-ao: HadGEM2-AO
+      - hadgem2-cc: HadGEM2-CC
+      - hadgem2-es: HadGEM2-ES
+      - inmcm4: INM-CM4
+      - ipsl-cm5a-mr: IPSL-CM5A-MR
+      - ipsl-cm5b-lr: IPSL-CM5A-LR
+      - miroc5: MIROC5
+      - miroc-esm-chem: MIROC-ESM-CHEM
+      - miroc-esm: MIROC-ESM
+      - mpi-esm-lr: MPI-ESM-LR
+      - mpi-esm-mr: MPI-ESM-MR
+      - mri-cgcm3: MRI-CGCM3
+      - noresm1-m: NorESM1-M
+  loca:
+    data: "/glade/u/home/jhamman/workdir/LOCA_daily/met_data/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc"
+    gcms:  # Mapping from dataset notation to official CMIP5 notation
+      ACCESS1-0: ACCESS1-0
+      ACCESS1-3: ACCESS1-3
+      bcc-csm1-1: BCC-CSM1-1
+      bcc-csm1-1-m: BCC-CSM1-1-M
+      CanESM2: CanESM2
+      CCSM4: CCSM4
+      CESM1-BGC: CESM1-BGC
+      CESM1-CAM5: CESM1-CAM5
+      CMCC-CM: CMCC-CM
+      CMCC-CMS: CMCC-CMS
+      CNRM-CM5: CNRM-CM5
+      CSIRO-Mk3-6-0: CSIRO-Mk3.6.0
+      EC-EARTH: EC-EARTH
+      FGOALS-g2: FGOALS-g2
+      GFDL-CM3: GFDL-CM3
+      GFDL-ESM2G: GFDL-ESM2G
+      GFDL-ESM2M: GFDL-ESM2M
+      GISS-E2-H: GISS-E2-H
+      GISS-E2-R: GISS-E2-R
+      HadGEM2-AO: HadGEM2-AO
+      HadGEM2-CC: HadGEM2-CC
+      HadGEM2-ES: HadGEM2-ES
+      inmcm4: INM-CM4
+      IPSL-CM5A-LR: IPSL-CM5A-LR
+      IPSL-CM5A-MR: IPSL-CM5A-MR
+      MIROC5: MIROC5
+      MIROC-ESM: MIROC-ESM
+      MIROC-ESM-CHEM: MIROC-ESM-CHEM
+      MPI-ESM-LR: MPI-ESM-LR
+      MPI-ESM-MR: MPI-ESM-MR
+      MRI-CGCM3: MRI-CGCM3
+      NorESM1-M: NorESM1-M
