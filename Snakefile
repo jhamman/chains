@@ -1,3 +1,4 @@
+import glob
 import os
 from tools.utilities import make_case_readme
 
@@ -12,6 +13,18 @@ def get_year_range(years):
     return list(range(years['start'], years['stop'] + 1))
 
 
+def inverse_lookup(d, key):
+    for k, v in d.items():
+        if v == key:
+            return k
+    raise KeyError(key)
+
+
+def maybe_make_yaml_list(obj):
+    if isinstance(obj, str) or not hasattr(obj, '__iter__'):
+        return obj
+    return '[%s]' % ', '.join('"{0}"'.format(l) for l in obj)
+
 def vic_forcings(wcs):
     return [os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}', 'disagg_data',
                          '{disagg_method}.force_{gcm}_{scen}_{dsm}_{year}0101-{year}1231.nc').format(
@@ -20,11 +33,32 @@ def vic_forcings(wcs):
 
 
 def metsim_forcings(wcs):
-    if wcs.dsm == 'icar':
-        f = '/glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc'.format(gcm=wcs.gcm, scen=wcs.scen)
+    gcm = inverse_lookup(config['DOWNSCALING'][wcs.dsm]['gcms'], wcs.gcm)
+
+    if wcs.dsm == 'bcsd' and wcs.scen == 'hist':
+        scen = 'rcp45'
     else:
-        f = os.path.join('/glade/scratch/jhamman/', 'MISSING.nc')  # placeholder
-    return f
+        scen = wcs.scen
+
+    files = glob.glob(config['DOWNSCALING'][wcs.dsm]['data'].format(
+        gcm=gcm, scen=scen, year=wcs.year))
+    return files
+
+def metsim_state(wcs):
+    gcm = inverse_lookup(config['DOWNSCALING'][wcs.dsm]['gcms'], wcs.gcm)
+    year = int(wcs.year)
+    scen = wcs.scen
+    if year == 2006:
+        year -= 1
+        scen = 'hist'
+    if wcs.dsm == 'bcsd' and scen == 'hist':
+        scen = 'rcp45'
+
+    pattern = config['DOWNSCALING'][wcs.dsm]['data'].format(
+        gcm=gcm, scen=scen, year=year)
+    files = glob.glob(pattern)
+    return files
+
 # Workflow bookends
 onsuccess:
     print('Workflow finished, no error')
@@ -38,6 +72,7 @@ onstart:
 
 # Rules
 # -----------------------------------------------------------------------------
+localrules: readme, setup_casedirs, hydrology_models, config_vic, disagg_methods, config_metsim
 
 # readme / logs
 rule readme:
@@ -136,7 +171,8 @@ rule run_metsim:
     input:
         os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
                      'configs', 'metsim_{gcm}_{scen}_{dsm}_{year}.cfg'),
-        forcing = metsim_forcings
+        forcing = metsim_forcings,
+        state = metsim_state
     output:
         os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
                      'disagg_data',  'metsim.force_{gcm}_{scen}_{dsm}_{year}0101-{year}1231.nc')
@@ -144,35 +180,32 @@ rule run_metsim:
         "echo {input}; touch {output}"
 
 
+# "ms -n 10 {input.config}"
+
+
 rule config_metsim:
     input:
         config['DISAGG']['metsim']['subdaily']['template'],
-        forcing = metsim_forcings
+        forcing = metsim_forcings,
+        state = metsim_state
     output:
-        os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
-                     'configs', 'metsim_{gcm}_{scen}_{dsm}_{year}.cfg')
+        config = os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}',
+                              'configs', 'metsim_{gcm}_{scen}_{dsm}_{year}.cfg')
     run:
-        data_dir = os.path.dirname(output).replace('configs', 'disagg_data')
-        out_state = os.path.join(data_dir, 'metsim.state_{gcm}_{scen}_{dsm}_{year}1231.nc')
+        data_dir = os.path.dirname(output.config).replace('configs', 'disagg_data')
+        out_state = os.path.join(data_dir, 'metsim.state_{gcm}_{scen}_{dsm}_{year}1231.nc'.format(**wildcards))
 
-        if params.year == '2006':
-            in_state = make_metsim_statename(data_dir, 'metsim.force_{gcm}_{scen}_{dsm}.',
-                                             params.gcm, 'hist',
-                                             params.dsm,
-                                             int(params.year) - 1)
-        else:
-            in_state = input.forcing
+        prefix = 'metsim.force_{gcm}_{scen}_{dsm}.'.format(**wildcards)
 
-        prefix = 'metsim.force_{gcm}_{scen}_{dsm}.'.format(**params)
-
-        with open(input, 'r') as f:
+        with open(input[0], 'r') as f:
             template = f.read()
         with open(output.config, 'w') as f:
-            f.write(template.format(year=params.year,
-                                    forcing=input.forcing,
+            f.write(template.format(forcing=maybe_make_yaml_list(input.forcing),
                                     metsim_dir=data_dir,
                                     prefix=prefix,
-                                    input_state=in_state,
-                                    output_state=out_state))
+                                    input_state=maybe_make_yaml_list(input.state),
+                                    output_state=out_state,
+                                    out_vars=config['DISAGG']['metsim']['subdaily']['out_vars'],
+                                    **wildcards))
     # shell:
     #     "touch {output}"

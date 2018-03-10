@@ -1,14 +1,14 @@
 
 GCMS:
-  - access13
-  - canesm
-  - cesm
-  - cnrm
-  - gfdl
-  - ipsl
-  - miroc5
-  - mri
-  - noresm
+  # - ACCESS1-3 (missing in bcsd)
+  - CanESM2
+  - CCSM4
+  - CNRM-CM5
+  - GFDL-CM3
+  - IPSL-CM5A-MR
+  - MIROC5
+  - MRI-CGCM3
+  - NorESM1-M
   # - giss (missing rcp85)
 SCENARIOS:
   - hist
@@ -16,16 +16,16 @@ SCENARIOS:
   - rcp85
 DOWNSCALING_METHODS:
   - bcsd
-  - loca
-  - icar
-  - gard  # placeholder
+  # - loca
+  # - icar
+  # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
   - vic  # placeholder
-  - prms  # placeholder
-  - fuse  # placeholder
-  - summa  # placeholder
+  # - prms  # placeholder
+  # - fuse  # placeholder
+  # - summa  # placeholder
 ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
@@ -50,11 +50,11 @@ __default__:
 run_metsim:
   queue: economy
   walltime: '04:00:00'
-  select: select=1:ncpus=36:mpiprocs=36
+  select: 1:ncpus=36:mpiprocs=36
 run_vic:
   queue: economy
   walltime: '04:00:00'
-  select: select=2:ncpus=36:mpiprocs=36
+  select: 2:ncpus=36:mpiprocs=36
 
 
 # Configuration settings for each method
@@ -113,40 +113,41 @@ DOWNSCALING:
       miroc5: MIROC5
       mri: MRI-CGCM3
       noresm: NorESM1-M
+      # - giss (missing rcp85)
   bcsd:
     data: "/glade/u/home/jhamman/workdir/reruns/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc"
     gcms:  # Mapping from dataset notation to official CMIP5 notation
-      - access1-0: ACCESS1-0
-      - bcc-csm1-1-m: BCC-CSM1-1-M
-      - bcc-csm1-1: BCC-CSM1-1
-      - canesm2: CanESM2
-      - ccsm4: CCSM4
-      - cesm1-bgc: CESM1-BGC
-      - cesm1-cam5: CESM1-CAM5
-      - cmcc-cm: CMCC-CM
-      - cnrm-cm5: CNRM-CM5
-      - csiro-mk3-6-0: CSIRO-Mk3.6.0
-      - fgoals-g2: FGOALS-g2
-      - fio-esm: GFDL-CM3
-      - gfdl-cm3: GFDL-CM3
-      - gfdl-esm2g: GFDL-ESM2G
-      - gfdl-esm2m: GFDL-ESM2M
-      - giss-e2-h-cc: GISS-E2-H-CC
-      - giss-e2-r-cc: GISS-E2-R-CC
-      - giss-e2-r: GISS-E2-R
-      - hadgem2-ao: HadGEM2-AO
-      - hadgem2-cc: HadGEM2-CC
-      - hadgem2-es: HadGEM2-ES
-      - inmcm4: INM-CM4
-      - ipsl-cm5a-mr: IPSL-CM5A-MR
-      - ipsl-cm5b-lr: IPSL-CM5A-LR
-      - miroc5: MIROC5
-      - miroc-esm-chem: MIROC-ESM-CHEM
-      - miroc-esm: MIROC-ESM
-      - mpi-esm-lr: MPI-ESM-LR
-      - mpi-esm-mr: MPI-ESM-MR
-      - mri-cgcm3: MRI-CGCM3
-      - noresm1-m: NorESM1-M
+      access1-0: ACCESS1-0
+      bcc-csm1-1-m: BCC-CSM1-1-M
+      bcc-csm1-1: BCC-CSM1-1
+      canesm2: CanESM2
+      ccsm4: CCSM4
+      cesm1-bgc: CESM1-BGC
+      cesm1-cam5: CESM1-CAM5
+      cmcc-cm: CMCC-CM
+      cnrm-cm5: CNRM-CM5
+      csiro-mk3-6-0: CSIRO-Mk3.6.0
+      fgoals-g2: FGOALS-g2
+      fio-esm: GFDL-CM3
+      gfdl-cm3: GFDL-CM3
+      gfdl-esm2g: GFDL-ESM2G
+      gfdl-esm2m: GFDL-ESM2M
+      giss-e2-h-cc: GISS-E2-H-CC
+      giss-e2-r-cc: GISS-E2-R-CC
+      giss-e2-r: GISS-E2-R
+      hadgem2-ao: HadGEM2-AO
+      hadgem2-cc: HadGEM2-CC
+      hadgem2-es: HadGEM2-ES
+      inmcm4: INM-CM4
+      ipsl-cm5a-mr: IPSL-CM5A-MR
+      ipsl-cm5b-lr: IPSL-CM5A-LR
+      miroc5: MIROC5
+      miroc-esm-chem: MIROC-ESM-CHEM
+      miroc-esm: MIROC-ESM
+      mpi-esm-lr: MPI-ESM-LR
+      mpi-esm-mr: MPI-ESM-MR
+      mri-cgcm3: MRI-CGCM3
+      noresm1-m: NorESM1-M
   loca:
     data: "/glade/u/home/jhamman/workdir/LOCA_daily/met_data/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc"
     gcms:  # Mapping from dataset notation to official CMIP5 notation
