@@ -10,6 +10,8 @@ dependencies:
   - numba
   - numpy
   - scipy
+  - dask
+  - distributed
   - pytest
   - pip:
     - coveralls

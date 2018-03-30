@@ -1,43 +1,44 @@
 
 GCMS:
   # - ACCESS1-3 (missing in bcsd)
-  - CanESM2
-  - CCSM4
-  - CNRM-CM5
-  - GFDL-CM3
-  - IPSL-CM5A-MR
-  - MIROC5
+  # - CanESM2
+  # - CCSM4
+  # - CNRM-CM5
+  # - GFDL-CM3
+  # - IPSL-CM5A-MR
+  # - MIROC5
   - MRI-CGCM3
   - NorESM1-M
   # - giss (missing rcp85)
 SCENARIOS:
   - hist
-  - rcp45
+  # - rcp45
   - rcp85
 DOWNSCALING_METHODS:
   - bcsd
-  # - loca
-  # - icar
+  - loca
+  - icar
   # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
-  - vic  # placeholder
-  # - prms  # placeholder
+  vic_mpr: vic
+  vic_default: vic
+  prms_default: prms
   # - fuse  # placeholder
   # - summa  # placeholder
 ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
   hist:
-    start: 2001
+    start: 2003
     stop: 2005
   rcp45:
     start: 2006
-    stop: 2010
+    stop: 2008
   rcp85:
     start: 2006
-    stop: 2010
+    stop: 2008
 
 # Cluster configuration
 machine: cheyenne
@@ -45,34 +46,36 @@ workdir: /glade/scratch/jhamman/storylines_ensemble/
 __default__:
   account: P48500028
   queue: share
-  walltime: '00:30:00'
-  select: '1'
+  walltime: 00:30:00
+  select: 1
 run_metsim:
   queue: economy
-  walltime: '04:00:00'
-  select: 1:ncpus=36:mpiprocs=36
+  walltime: 01:00:00
+  select: 1:ncpus=36:mpiprocs=36:mem=109GB
 run_vic:
   queue: economy
-  walltime: '04:00:00'
-  select: 2:ncpus=36:mpiprocs=36
+  walltime: 04:00:00
+  select: 1:ncpus=36:mpiprocs=36
+dask:
+  scheduler_file: dask_scheduler.json
+  queue: premium
+  worker_walltime: 01:00:00
+  select: select=1:ncpus=36:mpiprocs=36:mem=109GB
+  interface: ib0
+  threads: 4
+  processes: 18
+  adapt:
+    minimum: 1
+    maximum: 10
+
+domain: /glade/p/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20171024.nc
 
 
 # Configuration settings for each method
 DISAGG:
   metsim:
-    daily:
-      timestep: 1440
-      template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
-      out_vars:
-        - temp
-        - prec
-        - shortwave
-        - longwave
-        - vapor_pressure
-        - rel_humid
-    subdaily:
-      timestep: 60
-      template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
+    1440:
       out_vars:
         - t_min
         - t_max
@@ -81,28 +84,39 @@ DISAGG:
         - shortwave
         - tskc
         - pet
+    60:
+      out_vars:
+        - temp
+        - prec
+        - shortwave
+        - longwave
+        - vapor_pressure
+        - rel_humid
+        - wind
 
-# A "model" is the combination of an executable, parameters, and config options
+# A 'model' is the combination of an executable, parameters, and config options
 HYDROLOGY:
-  vic_00:
-    # TODO: build executable as part of the workflow
+  vic_mpr:
     executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    # TODO: collect the parameters in a common location
-    parameters: /path/to/parameters.nc
-    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic_00.template.cfg
+    parameters: /glade/u/home/jhamman/projects/storylines/data/mpr_0.125deg.vic_parameters_qc.nc
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
-  prms_00:
-    # TODO: build executable as part of the workflow
+  vic_default:
+    executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    parameters: /glade/u/home/jhamman/projects/storylines/data/nldas_0.125deg.vic_parameters.nc
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
+    force_timestep: 60
+  prms_default:
     executable: /glade/u/home/mizukami/model/prms/bin/prmsv
-    # TODO: collect the parameters in a common location
-    parameters: /path/to/parameters.nc
-    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_00.template.cfg
+    parameters: /glade/p/ral/RHAP/naoki/storylines/prms/project/analog_regression_1.NCAR_WRF_50km.access13.hist/r1/input/r1_12k.wpar
+    # TODO: Ask about CONUS file
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
     force_timestep: 1440
 
 
 DOWNSCALING:
   icar:
-    data: "/glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc"
+    data: /glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access13: ACCESS1-3
       canesm: CanESM2
@@ -114,8 +128,14 @@ DOWNSCALING:
       mri: MRI-CGCM3
       noresm: NorESM1-M
       # - giss (missing rcp85)
+    variables:
+      lat: lat
+      lon: lon
+      prec: pcp
+      t_max: t_max
+      t_min: t_min
   bcsd:
-    data: "/glade/u/home/jhamman/workdir/reruns/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc"
+    data: /glade/u/home/jhamman/workdir/reruns/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access1-0: ACCESS1-0
       bcc-csm1-1-m: BCC-CSM1-1-M
@@ -148,8 +168,15 @@ DOWNSCALING:
       mpi-esm-mr: MPI-ESM-MR
       mri-cgcm3: MRI-CGCM3
       noresm1-m: NorESM1-M
+    variables:
+      lat: latitude
+      lon: longitude
+      prec: pr
+      t_max: tasmax
+      t_min: tasmin
+      wind: wind
   loca:
-    data: "/glade/u/home/jhamman/workdir/LOCA_daily/met_data/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc"
+    data: /glade/u/home/jhamman/workdir/LOCA_daily/met_data/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       ACCESS1-0: ACCESS1-0
       ACCESS1-3: ACCESS1-3
@@ -183,3 +210,9 @@ DOWNSCALING:
       MPI-ESM-MR: MPI-ESM-MR
       MRI-CGCM3: MRI-CGCM3
       NorESM1-M: NorESM1-M
+    variables:
+      lat: lat
+      lon: lon
+      prec: pr
+      t_max: tasmax
+      t_min: tasmin
