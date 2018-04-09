@@ -1,13 +1,14 @@
 import glob
+import logging
 import os
 
 from itertools import product
 
+from datetime import datetime
+
 import pandas as pd
 import xarray as xr
 
-import dask.multiprocessing
-from dask_jobqueue import PBSCluster
 from dask.distributed import Client
 
 from tools.utilities import make_case_readme, log_to_readme
@@ -36,6 +37,13 @@ def maybe_make_cfg_list(obj):
     elif len(obj) == 1:
         return obj[0]
     return '%s' % ', '.join(obj)
+
+
+def try_to_close_client(client):
+    try:
+        client.close(1)
+    except TimeoutError:
+        pass
 
 
 def hydro_forcings(wcs):
@@ -91,6 +99,87 @@ def get_downscaling_data(wcs):
     return files
 
 
+def loca_preproc(ds):
+    if 'latitude' in ds.coords:
+        ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
+    return ds
+
+
+def process_downscaling_dataset(input_files, output_file, kind, times,
+                                like=None, rename=None):
+
+    if like:
+        like = xr.open_dataset(like)
+
+    if kind == 'loca':
+        preproc = loca_preproc
+    else:
+        preproc = None
+
+    ds = xr.open_mfdataset(input_files, autoclose=True,
+                           preprocess=preproc,
+                           engine='netcdf4', chunks={'time': 50})
+
+    if rename:
+        try:
+            ds = ds.rename(
+                {v: k for k, v in rename.items()})[list(rename)]
+        except ValueError:
+            print(ds)
+            raise
+    ds = ds.sel(time=times)
+
+    # drop bound variables
+    drops = []
+    for v in ['lon_bnds', 'lat_bnds', 'time_bnds']:
+        if v in ds or v in ds.coords:
+            drops.append(v)
+    ds = ds.drop(drops)
+
+    if like:
+        ds = ds.reindex_like(like, method='nearest')
+
+    if 'wind' not in ds:
+        ds['wind'] = xr.full_like(ds['prec'], DEFAULT_WIND)
+        ds['wind'].attrs['units'] = 'm s-1'
+        ds['wind'].attrs['long_name'] = 'wind speed'
+
+    if kind == 'loca':
+        # normalize units
+        ds['prec'] = ds['prec'] * SEC_PER_DAY
+        ds['prec'].attrs['units'] = 'mm d-1'
+        ds['prec'].attrs['long_name'] = 'precipitation'
+
+        ds['t_max'] = ds['t_max'] - KELVIN
+        ds['t_max'].attrs['units'] = 'C'
+
+    # quality control checks
+    ds['t_max'] = ds['t_max'].where(ds['t_max'] > ds['t_min'],
+                                    ds['t_min'] + TINY_TEMP)
+    ds['prec'] = ds['prec'].where(ds['prec'] < 0, 0.)
+    ds['wind'] = ds['wind'].where(ds['wind'] < 0, 0.)
+
+    if like and 'mask' in like:
+        ds = ds.where(like['mask'])
+
+    ds = ds.load()
+
+    # TODO: save the original attributes and put them back
+
+    # make sure time index in dataset cover the full period
+    dates = pd.date_range(times.start, times.stop, freq='D')
+    # fill leap day using linear interpolation
+    ds = ds.resample(time='1D', keep_attrs=True).mean().interpolate_na(
+        dim='time', limit=2)
+    # fill in missing days at the end or begining of the record
+    if ds.dims['time'] != len(dates):
+        ds = ds.reindex(time=dates, method='ffill')
+
+    # TODO, update time encoding to use common units for all files
+    ds.to_netcdf(output_file, engine='h5netcdf',
+                 unlimited_dims=['time'])
+
+
 def metsim_state(wcs):
     year = int(wcs.year)
     scen = wcs.scen
@@ -111,31 +200,6 @@ def hydro_template(wcs):
     return config['HYDROLOGY'][wcs.model]['template']
 
 
-def start_dask(config):
-    cluster = PBSCluster(queue=config['dask']['queue'],
-                         walltime=config['dask']['worker_walltime'],
-                         project=config['__default__']['account'],
-                         resource_spec=config['dask']['select'],
-                         interface=config['dask']['interface'],
-                         threads=config['dask']['threads'],
-                         processes=config['dask']['processes'])
-    client = Client(cluster)
-    client.write_scheduler_file(DASK_SCHEDULER)
-
-    cluster.start_workers(config['dask']['initial_workers'])
-    if config['dask'].get('adapt', None):
-        cluster.adapt(**config['dask']['adapt'])
-
-    return cluster, config
-
-
-def try_to_close_client(client):
-    try:
-        client.close(1)
-    except TimeoutError:
-        pass
-
-
 # Workflow bookends
 onsuccess:
     print('Workflow finished, no error')
@@ -146,18 +210,17 @@ onerror:
 onstart:
     print('starting now')
 
-
-DASK_SCHEDULER = os.path.join(
-    config['workdir'], config['dask']['scheduler_file'])
-DASK_SCHEDULER = None
-
 # Readme / documentation
 CASEDIR = os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}')
 README = os.path.join(CASEDIR, 'readme.md')
 
 # Downscaling temporary filenames
-DOWNSCALING_DATA = os.path.join(CASEDIR, 'downscaling_data',
-                                'forcing_{gcm}.{scen}.{dsm}.{year}.nc')
+DOWNSCALING_DIR = os.path.join(CASEDIR, 'downscaling_data')
+DOWNSCALING_DATA = os.path.join(
+    DOWNSCALING_DIR, 'downscale.{gcm}.{scen}.{dsm}.{year}.nc')
+DOWNSCALING_LOG = os.path.join(
+    CASEDIR, 'logs',
+    'downscale.{gcm}.{scen}.{dsm}.{year}.%Y%m%d-%H%M%d.log.txt')
 
 
 CONFIGS_DIR = os.path.join(CASEDIR, 'configs')
@@ -166,11 +229,14 @@ CONFIGS_DIR = os.path.join(CASEDIR, 'configs')
 DISAGG_DIR = os.path.join(CASEDIR, 'disagg_data')
 DISAGG_CONFIG = os.path.join(
     CONFIGS_DIR, 'config.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.{year}.cfg')
+DISAGG_LOG = os.path.join(
+    CASEDIR, 'logs', 'disagg.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.{year}.%Y%m%d-%H%M%d.log.txt')
 METSIM_STATE = os.path.join(
     DISAGG_DIR, 'state.{gcm}.{scen}.{dsm}.{disagg_method}.{year}1231.nc')
 DISAGG_PREFIX = 'force.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}'
 DISAGG_OUTPUT = os.path.join(DISAGG_DIR,
                              DISAGG_PREFIX + '_{year}0101-{year}1231.nc')
+
 
 DISAGG_OUTPUT_PRMS = os.path.join(
     DISAGG_DIR,
@@ -185,10 +251,12 @@ HYDRO_OUTPUT = os.path.join(
     HYDRO_OUT_DIR, 'hist.{model_id}.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{outstep}.nc')
 HYDRO_CONFIG = os.path.join(
     CONFIGS_DIR, 'config.{model_id}.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.txt')
+HYDRO_LOG = os.path.join(
+    CASEDIR, 'logs', 'hydro.{model_id}.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.%Y%m%d-%H%M%d.log.txt')
 
 # VIC Filenames
 VIC_STATE = os.path.join(
-    HYDRO_OUT_DIR, 'state.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{date}.nc')
+    HYDRO_OUT_DIR, 'state.vic.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{date}.nc')
 VIC_FORCING = os.path.join(
     DISAGG_DIR,
     'forcing.vic.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.{year}.nc')  # No months/days
@@ -196,6 +264,10 @@ VIC_FORCING = os.path.join(
 # PRMS Forcings
 PRMS_FORCINGS = os.path.join(
     DISAGG_DIR, 'forcing.prms.{gcm}.{scen}.{dsm}.{disagg_method}.nc')  # No months/days
+PRMS_OUTPUT_PREFIX = os.path.join(
+    HYDRO_OUT_DIR, 'hist.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}')
+PRMS_STATE = os.path.join(
+    HYDRO_OUT_DIR, 'state.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{date}.bin')
 
 # Default Values
 DEFAULT_WIND = 1.
@@ -204,9 +276,11 @@ TINY_TEMP = 1e-10
 # Constants
 KELVIN = 273.16
 SEC_PER_DAY = 86400
+
+NOW = datetime.now()
 # Rules
 # -----------------------------------------------------------------------------
-localrules: readme, setup_casedirs, config_metsim, config_vic, config_prms, hydrology_models, disagg_methods, rename_hydro_forcings_for_vic
+localrules: readme, setup_casedirs, config_metsim, config_vic, config_prms, hydrology_models, disagg_methods, rename_hydro_forcings_for_vic, config_hydro_models, disagg_configs, prms_data_file,
 
 # readme / logs
 rule readme:
@@ -310,21 +384,21 @@ rule rename_hydro_forcings_for_vic:
 
 
 rule reformat_prms_forcings:
-    input: prms_forcings_from_disagg
+    input:
+        prms_forcings_from_disagg,
+        grid_file = '/glade/p/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt'
     output: PRMS_FORCINGS
     run:
-        client = Client(n_workers=threads, threads_per_worker=threads)
+        from .prms import read_grid_file, extract_nc
 
-        ds = xr.open_mfdataset(list(input), autoclose=True,
-                               engine='netcdf4')
-        ds.load().to_netcdf(output[0])
+        grid_df = read_grid_file(input.grid_file)
 
-        try_to_close_client(client)
+        extract_nc(input[0], grid_df, output[0])
 
 
 rule config_vic:
     input:
-        hydro_forcings,
+        # hydro_forcings,
         template = hydro_template
     output:
         config = HYDRO_CONFIG.replace('{model_id}', 'vic')
@@ -345,7 +419,9 @@ rule config_vic:
         options['statemonth'] = options['endmonth']
         options['stateday'] = options['endday']
         options['forcings'] = VIC_FORCING.format(
-            year='', **wildcards)[:-3]
+            year='',
+            disagg_ts=config['HYDROLOGY'][wildcards.model]['force_timestep'],
+            **wildcards)[:-3]
 
         options['parameters'] = config['HYDROLOGY'][wildcards.model]['parameters']
         options['result_dir'] = HYDRO_OUT_DIR.format(**wildcards)
@@ -356,7 +432,8 @@ rule config_vic:
         else:
             kwargs = dict(wildcards)
             kwargs['scen'] = 'hist'
-            options['init_state'] = VIC_STATE.format(date='yyyy-12-31-82800', **kwargs)
+            options['init_state'] = VIC_STATE.format(
+                date='yyyy-12-31-82800', **kwargs)
 
         with open(input.template, 'r') as f:
             template = f.read()
@@ -371,34 +448,57 @@ rule run_vic:
         config = HYDRO_CONFIG.replace('{model_id}', 'vic')
     output:
         HYDRO_OUTPUT.replace('{model_id}', 'vic')
+    log:
+        NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     shell:
-        "mpiexec_mpt {input.vic_exe} -g {input.config}"
+        "mpiexec_mpt {input.vic_exe} -g {input.config} > {log} 2>&1"
 
 
 # forcings: /glade/p/ral/RHAP/naoki/storylines/prms/project/analog_regression_1.NCAR_WRF_50km.access13.hist/r1/input/analog_regression_1.NCAR_WRF_50km.access13.hist_1.data
 rule config_prms:
     input:
-        forcing = hydro_forcings,
+        forcing = PRMS_FORCINGS,
         template = hydro_template
     output:
         config = HYDRO_CONFIG.replace('{model_id}', 'prms')
     run:
         options = {}
 
-        options['out_prefix'] = HYDRO_OUT_DIR.format(**wildcards)
+        options['startyear'] = config['SCEN_YEARS'][wildcards.scen]['start']
+        options['endyear'] = config['SCEN_YEARS'][wildcards.scen]['stop']
+
+        options['out_prefix'] = PRMS_OUTPUT_PREFIX.format(**wildcards)
+        options['data_file'] = config['HYDROLOGY'][wildcards.model]['data_file']
         options['param_file'] = config['HYDROLOGY'][wildcards.model]['parameters']
         options['forcing'] = input.forcing
-        options['t_max'] = 't_max'
-        options['t_min'] = 't_max'
-        options['prec'] = 'prec'
-        options['shortwave'] = options['shortwave']
-        options['input_state'] = 'MISSING'
-        options['output_state'] = 'MISSING'
+        options['write_state_file'] = 1
+        options['output_state'] = PRMS_STATE.format(
+            date='%s-12-31' % options['startyear'], **wildcards)
+
+        # TODO
+        options['use_init_state_file'] = 0
+        options['input_state'] = PRMS_STATE.format(date='MISSING', **wildcards)
 
         with open(input.template, 'r') as f:
             template = f.read()
         with open(output.config, 'w') as f:
             f.write(template.format(**options, **wildcards))
+
+
+rule prms_data_file:
+    output: 'templates/prms_data_file.txt'
+    run:
+        header = '''////////////////////////////////////////////////////////////
+// runoff = cfs
+////////////////////////////////////////////////////////////
+runoff 1
+########################################
+'''
+        dates = pd.date_range('1900-01-01', '2100-12-31')
+        lines = [d.strftime('%Y %m %d 0 0 0 0') for d in dates]
+        with open(output[0], 'w') as f:
+            f.write(header)
+            f.write('\n'.join(lines))
 
 rule run_prms:
     input:
@@ -407,8 +507,10 @@ rule run_prms:
         prms_exe = hydro_executable
     output:
         HYDRO_OUTPUT.replace('{model_id}', 'prms')
+    log:
+        NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     shell:
-        "touch {output}"
+        "touch {output}  > {log} 2>&1"
 
 
 # rule run_fuse:
@@ -425,113 +527,30 @@ rule run_prms:
 #         "touch {output}"
 
 
-rule process_downscaling:
+rule downscaling:
     input:
         readme = README,
         files = get_downscaling_data,
     output:
         temp(DOWNSCALING_DATA)
-    threads: 4
+    threads: 36
+    log: NOW.strftime(DOWNSCALING_LOG)
     run:
 
-        def loca_preproc(ds):
-            if 'latitude' in ds.coords:
-                ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
-            return ds
-
-        def process_downscaling_dataset(input_files, output_file, kind, times,
-                                        like=None, rename=None):
-
-            if like:
-                like = xr.open_dataset(like)
-
-            if kind == 'loca':
-                preproc = loca_preproc
-            else:
-                preproc = None
-
-            ds = xr.open_mfdataset(input_files, autoclose=True,
-                                   preprocess=preproc,
-                                   engine='netcdf4', chunks={'time': 50})
-
-            if rename:
-                try:
-                    ds = ds.rename(
-                        {v: k for k, v in rename.items()})[list(rename)]
-                except ValueError:
-                    print(ds)
-                    raise
-            ds = ds.sel(time=times)
-
-            # drop bound variables
-            drops = []
-            for v in ['lon_bnds', 'lat_bnds', 'time_bnds']:
-                if v in ds or v in ds.coords:
-                    drops.append(v)
-            ds = ds.drop(drops)
-
-            if like:
-                ds = ds.reindex_like(like, method='nearest')
-
-            if 'wind' not in ds:
-                ds['wind'] = xr.full_like(ds['prec'], DEFAULT_WIND)
-                ds['wind'].attrs['units'] = 'm s-1'
-                ds['wind'].attrs['long_name'] = 'wind speed'
-
-            if kind == 'loca':
-                # normalize units
-                ds['prec'] = ds['prec'] * SEC_PER_DAY
-                ds['prec'].attrs['units'] = 'mm d-1'
-                ds['prec'].attrs['long_name'] = 'precipitation'
-
-                ds['t_max'] = ds['t_max'] - KELVIN
-                ds['t_max'].attrs['units'] = 'C'
-
-            # quality control checks
-            ds['t_max'] = ds['t_max'].where(ds['t_max'] > ds['t_min'],
-                                            ds['t_min'] + TINY_TEMP)
-            ds['prec'] = ds['prec'].where(ds['prec'] < 0, 0.)
-            ds['wind'] = ds['wind'].where(ds['wind'] < 0, 0.)
-
-            if like and 'mask' in like:
-                ds = ds.where(like['mask'])
-
-            ds = ds.load()
-
-            # TODO: save the original attributes and put them back
-
-            # make sure time index in dataset cover the full period
-            dates = pd.date_range(times.start, times.stop, freq='D')
-            # fill leap day using linear interpolation
-            ds = ds.resample(time='1D', keep_attrs=True).mean().interpolate_na(
-                dim='time', limit=2)
-            # fill in missing days at the end or begining of the record
-            if ds.dims['time'] != len(dates):
-                ds = ds.reindex(time=dates, method='ffill')
-
-            # TODO, update time encoding to use common units for all files
-            ds.to_netcdf(output_file, engine='h5netcdf',
-                         unlimited_dims=['time'])
-
+        logging.basicConfig(filename=str(log), level=logging.DEBUG)
+        logging.info('Processing downscaling data for %s' % str(wildcards))
         log_to_readme('Processing downscaling data for %s' % str(wildcards),
                       input.readme)
 
         times = slice('%s-01-01' % wildcards.year, '%s-12-31' % wildcards.year)
         rename = config['DOWNSCALING'][wildcards.dsm]['variables']
 
-        if DASK_SCHEDULER is not None:
-            client = Client(scheduler_file=DASK_SCHEDULER)
-            print(client, flush=True)
-            future = client.submit(process_downscaling_dataset, input.files,
-                                   output[0], wildcards.dsm, times,
-                                   like=config['domain'],
-                                   rename=rename).result()
-        else:
-            client = Client(n_workers=threads, threads_per_worker=threads)
-            process_downscaling_dataset(
-                input.files, output[0], wildcards.dsm, times,
-                like=config['domain'], rename=rename)
-            try_to_close_client(client)
+        # client = Client(n_workers=threads)
+        # logging.debug(client)
+        process_downscaling_dataset(
+            input.files, output[0], wildcards.dsm, times,
+            like=config['domain'], rename=rename)
+        # try_to_close_client(client)
 
 
 rule run_metsim:
@@ -541,9 +560,10 @@ rule run_metsim:
         forcing = DOWNSCALING_DATA,
         state = metsim_state
     output: DISAGG_OUTPUT
+    log: NOW.strftime(DISAGG_LOG)
     threads: 36
     # conda: "envs/metsim.yaml"
-    shell: "ms -n {threads} {input.config}"
+    shell: "/glade/u/home/jhamman/anaconda/envs/storylines/bin/ms -n {threads} {input.config} > {log} 2>&1"
 
 rule config_metsim:
     input:

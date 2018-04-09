@@ -1,18 +1,18 @@
 
 GCMS:
   # - ACCESS1-3 (missing in bcsd)
-  # - CanESM2
-  # - CCSM4
+  - CanESM2
+  - CCSM4
   # - CNRM-CM5
-  # - GFDL-CM3
+  - GFDL-CM3
   # - IPSL-CM5A-MR
-  # - MIROC5
+  - MIROC5
   - MRI-CGCM3
   - NorESM1-M
   # - giss (missing rcp85)
 SCENARIOS:
   - hist
-  # - rcp45
+  - rcp45
   - rcp85
 DOWNSCALING_METHODS:
   - bcsd
@@ -31,14 +31,14 @@ ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
   hist:
-    start: 2003
+    start: 1951
     stop: 2005
   rcp45:
     start: 2006
-    stop: 2008
+    stop: 2099
   rcp85:
     start: 2006
-    stop: 2008
+    stop: 2099
 
 # Cluster configuration
 machine: cheyenne
@@ -48,27 +48,19 @@ __default__:
   queue: share
   walltime: 00:30:00
   select: 1
+downscaling:
+  queue: economy
+  select: 1:ncpus=10
 run_metsim:
   queue: economy
-  walltime: 01:00:00
+  walltime: 02:00:00
   select: 1:ncpus=36:mpiprocs=36:mem=109GB
 run_vic:
   queue: economy
   walltime: 04:00:00
   select: 1:ncpus=36:mpiprocs=36
-dask:
-  scheduler_file: dask_scheduler.json
-  queue: premium
-  worker_walltime: 01:00:00
-  select: select=1:ncpus=36:mpiprocs=36:mem=109GB
-  interface: ib0
-  threads: 4
-  processes: 18
-  adapt:
-    minimum: 1
-    maximum: 10
 
-domain: /glade/p/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20171024.nc
+domain: /glade/p/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
 
 
 # Configuration settings for each method
@@ -91,8 +83,8 @@ DISAGG:
         - shortwave
         - longwave
         - vapor_pressure
-        - rel_humid
         - wind
+        - air_pressure
 
 # A 'model' is the combination of an executable, parameters, and config options
 HYDROLOGY:
@@ -108,9 +100,9 @@ HYDROLOGY:
     force_timestep: 60
   prms_default:
     executable: /glade/u/home/mizukami/model/prms/bin/prmsv
-    parameters: /glade/p/ral/RHAP/naoki/storylines/prms/project/analog_regression_1.NCAR_WRF_50km.access13.hist/r1/input/r1_12k.wpar
-    # TODO: Ask about CONUS file
+    parameters: /glade/p/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
+    data_file: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_data_file.txt
     force_timestep: 1440
 
 
