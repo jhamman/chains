@@ -156,8 +156,8 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
     # quality control checks
     ds['t_max'] = ds['t_max'].where(ds['t_max'] > ds['t_min'],
                                     ds['t_min'] + TINY_TEMP)
-    ds['prec'] = ds['prec'].where(ds['prec'] < 0, 0.)
-    ds['wind'] = ds['wind'].where(ds['wind'] < 0, 0.)
+    ds['prec'] = ds['prec'].where(ds['prec'] > 0, 0.)
+    ds['wind'] = ds['wind'].where(ds['wind'] > 0, 0.)
 
     if like and 'mask' in like:
         ds = ds.where(like['mask'])
@@ -240,7 +240,7 @@ DISAGG_OUTPUT = os.path.join(DISAGG_DIR,
 
 DISAGG_OUTPUT_PRMS = os.path.join(
     DISAGG_DIR,
-    'forcing.vic.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.nc')  # All in one file
+    'forcing.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.nc')  # All in one file
 
 # Hydrology
 HYDRO_OUT_DIR = os.path.join(CASEDIR, 'hydro_data')
@@ -333,6 +333,18 @@ rule config_hydro_models:
                model=list(config['HYDRO_METHODS'].keys()),
                model_id=set(config['HYDRO_METHODS'].values()))
 
+rule make_vic_forcings:
+    input:
+        [expand(VIC_FORCING, filtered_product,
+                gcm=config['GCMS'], scen=scen,
+                disagg_method=config['DISAGG_METHODS'],
+                dsm=config['DOWNSCALING_METHODS'],
+                model=list(config['HYDRO_METHODS'].keys()),
+                disagg_ts=['60'],
+                model_id=set(config['HYDRO_METHODS'].values()),
+                year=get_year_range(config['SCEN_YEARS'][scen]))
+         for scen in config['SCENARIOS']]
+
 # Hydrologic Models
 rule hydrology_models:
     input:
@@ -398,7 +410,7 @@ rule reformat_prms_forcings:
 
 rule config_vic:
     input:
-        # hydro_forcings,
+        hydro_forcings,
         template = hydro_template
     output:
         config = HYDRO_CONFIG.replace('{model_id}', 'vic')
@@ -457,7 +469,7 @@ rule run_vic:
 # forcings: /glade/p/ral/RHAP/naoki/storylines/prms/project/analog_regression_1.NCAR_WRF_50km.access13.hist/r1/input/analog_regression_1.NCAR_WRF_50km.access13.hist_1.data
 rule config_prms:
     input:
-        forcing = PRMS_FORCINGS,
+        # forcing = PRMS_FORCINGS,
         template = hydro_template
     output:
         config = HYDRO_CONFIG.replace('{model_id}', 'prms')
@@ -470,7 +482,7 @@ rule config_prms:
         options['out_prefix'] = PRMS_OUTPUT_PREFIX.format(**wildcards)
         options['data_file'] = config['HYDROLOGY'][wildcards.model]['data_file']
         options['param_file'] = config['HYDROLOGY'][wildcards.model]['parameters']
-        options['forcing'] = input.forcing
+        options['forcing'] = PRMS_FORCINGS.format(**wildcards)  # input.forcing
         options['write_state_file'] = 1
         options['output_state'] = PRMS_STATE.format(
             date='%s-12-31' % options['startyear'], **wildcards)
