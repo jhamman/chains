@@ -2,28 +2,28 @@
 GCMS:
   # - ACCESS1-3 (missing in bcsd)
   - CanESM2
-  - CCSM4
+  # - CCSM4
   # - CNRM-CM5
-  - GFDL-CM3
-  # - IPSL-CM5A-MR
-  - MIROC5
-  - MRI-CGCM3
-  - NorESM1-M
+  # - GFDL-CM3
+  # # - IPSL-CM5A-MR
+  # - MIROC5
+  # - MRI-CGCM3
+  # - NorESM1-M
   # - giss (missing rcp85)
 SCENARIOS:
   - hist
-  - rcp45
+  # - rcp45
   - rcp85
 DOWNSCALING_METHODS:
-  - bcsd
+  # - bcsd
   - loca
   - icar
   # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
-  vic_mpr: vic
-  vic_default: vic
+  # vic_mpr: vic
+  # vic_default: vic
   prms_default: prms
   # - fuse  # placeholder
   # - summa  # placeholder
@@ -31,14 +31,14 @@ ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
   hist:
-    start: 1951
+    start: 2004
     stop: 2005
   rcp45:
     start: 2006
     stop: 2099
   rcp85:
     start: 2006
-    stop: 2099
+    stop: 2008
 
 # Cluster configuration
 machine: cheyenne
@@ -50,15 +50,20 @@ __default__:
   select: 1
 downscaling:
   queue: economy
-  select: 1:ncpus=10
+  select: 1:ncpus=36:mem=109GB
+reformat_prms_forcings:
+  queue: economy
+  select: 1:ncpus=36:mem=109GB
 run_metsim:
   queue: economy
-  walltime: 02:00:00
+  walltime: 01:00:00
   select: 1:ncpus=36:mpiprocs=36:mem=109GB
 run_vic:
   queue: economy
-  walltime: 04:00:00
+  walltime: 12:00:00
   select: 1:ncpus=36:mpiprocs=36
+run_prms:
+  walltime: 03:00:00
 
 domain: /glade/p/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
 
@@ -90,19 +95,22 @@ DISAGG:
 HYDROLOGY:
   vic_mpr:
     executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade/u/home/jhamman/projects/storylines/data/mpr_0.125deg.vic_parameters_qc.nc
+    parameters: /glade/p/work/jhamman/storylines/data/vic_params/mpr_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
+    baseflow: NIJSSEN2001
   vic_default:
     executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade/u/home/jhamman/projects/storylines/data/nldas_0.125deg.vic_parameters.nc
+    parameters: /glade/p/work/jhamman/storylines/data/vic_params/maurer_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
+    baseflow: ARNO
   prms_default:
     executable: /glade/u/home/mizukami/model/prms/bin/prmsv
     parameters: /glade/p/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
     data_file: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_data_file.txt
+    grid_file: /glade/p/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt
     force_timestep: 1440
 
 
