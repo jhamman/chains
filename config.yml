@@ -7,23 +7,23 @@ GCMS:
   # - GFDL-CM3
   # # - IPSL-CM5A-MR
   # - MIROC5
-  # - MRI-CGCM3
+  - MRI-CGCM3
   # - NorESM1-M
   # - giss (missing rcp85)
 SCENARIOS:
   - hist
-  # - rcp45
+  - rcp45
   - rcp85
 DOWNSCALING_METHODS:
-  # - bcsd
+  - bcsd
   - loca
   - icar
   # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
-  # vic_mpr: vic
-  # vic_default: vic
+  vic_mpr: vic
+  vic_default: vic
   prms_default: prms
   # - fuse  # placeholder
   # - summa  # placeholder
@@ -35,10 +35,10 @@ SCEN_YEARS:
     stop: 2005
   rcp45:
     start: 2006
-    stop: 2099
+    stop: 2007
   rcp85:
     start: 2006
-    stop: 2008
+    stop: 2007
 
 # Cluster configuration
 machine: cheyenne
