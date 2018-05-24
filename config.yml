@@ -1,15 +1,15 @@
 
 GCMS:
-  # - ACCESS1-3 (missing in bcsd)
+  # # - ACCESS1-3 (missing in bcsd)
   - CanESM2
-  # - CCSM4
-  # - CNRM-CM5
-  # - GFDL-CM3
+  - CCSM4
+  - CNRM-CM5
+  - GFDL-CM3
   # # - IPSL-CM5A-MR
-  # - MIROC5
+  - MIROC5
   - MRI-CGCM3
-  # - NorESM1-M
-  # - giss (missing rcp85)
+  - NorESM1-M
+  # # - giss (missing rcp85)
 SCENARIOS:
   - hist
   - rcp45
@@ -31,18 +31,18 @@ ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
   hist:
-    start: 2004
+    start: 1953
     stop: 2005
   rcp45:
     start: 2006
-    stop: 2007
+    stop: 2099
   rcp85:
     start: 2006
-    stop: 2007
+    stop: 2099
 
 # Cluster configuration
 machine: cheyenne
-workdir: /glade/scratch/jhamman/storylines_ensemble/
+workdir: /gpfs/flash/jhamman/storylines_ensemble/
 __default__:
   account: P48500028
   queue: share
@@ -94,19 +94,19 @@ DISAGG:
 # A 'model' is the combination of an executable, parameters, and config options
 HYDROLOGY:
   vic_mpr:
-    executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade/p/work/jhamman/storylines/data/vic_params/mpr_0.125deg.vic_parameters.qc.nc
+    executable: /glade2/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    parameters: /glade2/work/jhamman/storylines/data/vic_params/mpr_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
     baseflow: NIJSSEN2001
   vic_default:
-    executable: /glade/p/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade/p/work/jhamman/storylines/data/vic_params/maurer_0.125deg.vic_parameters.qc.nc
+    executable: /glade2/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    parameters: /glade2/work/jhamman/storylines/data/vic_params/maurer_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
     baseflow: ARNO
   prms_default:
-    executable: /glade/u/home/mizukami/model/prms/bin/prmsv
+    executable: /glade2/work/jhamman/storylines/src/PRMS_V/bin
     parameters: /glade/p/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
     data_file: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_data_file.txt

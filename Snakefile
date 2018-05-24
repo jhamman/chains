@@ -214,6 +214,16 @@ def vic_init_state(wcs):
     return state
 
 
+def prms_init_state(wcs):
+    if wcs.scen == 'hist':
+        state = NULL_STATE
+    else:
+        kwargs = dict(wcs)
+        kwargs['scen'] = 'hist'
+        state = PRMS_STATE.format(**kwargs)
+    return state
+
+
 # Workflow bookends
 onsuccess:
     print('Workflow finished, no error')
@@ -227,6 +237,7 @@ onstart:
 # Readme / documentation
 CASEDIR = os.path.join(config['workdir'], '{gcm}', '{scen}', '{dsm}')
 README = os.path.join(CASEDIR, 'readme.md')
+BENCHMARK = os.path.join(CASEDIR, 'benchmark.txt')
 
 # Downscaling temporary filenames
 DOWNSCALING_DIR = os.path.join(CASEDIR, 'downscaling_data')
@@ -267,6 +278,10 @@ HYDRO_LOG = os.path.join(
     CASEDIR, 'logs', 'hydro.{model_id}.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.%Y%m%d-%H%M%d.log.txt')
 
 # VIC Filenames
+
+# e.g.state.vic.MRI-CGCM3.hist.bcsd.metsim.vic_mpr.20051231_00000.nc
+VIC_STATE_PREFIX = os.path.join(
+    HYDRO_OUT_DIR, 'state.vic.{gcm}.{scen}.{dsm}.{disagg_method}.{model}')
 VIC_STATE = os.path.join(
     HYDRO_OUT_DIR, 'state.vic.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.nc')
 VIC_FORCING = os.path.join(
@@ -280,7 +295,7 @@ PRMS_FORCINGS = os.path.join(
 PRMS_OUTPUT = os.path.join(
     HYDRO_OUT_DIR, 'hist.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.nc')
 PRMS_STATE = os.path.join(
-    HYDRO_OUT_DIR, 'state.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{year}-12-31.bin')
+    HYDRO_OUT_DIR, 'state.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.bin')
 
 # Dummy files
 NULL_STATE = 'null_state'  # for runs that don't get an initial state file
@@ -416,6 +431,7 @@ rule reformat_prms_forcings:
     input:
         prms_forcings_from_disagg,
     output: PRMS_FORCINGS
+    benchmark: BENCHMARK
     run:
         from prms import read_grid_file, extract_nc
 
@@ -445,7 +461,7 @@ rule config_vic:
         options['calendar'] = 'standard'  # TODO: read from metsim output
         options['domain'] = config['domain']
 
-        options['out_state'] = input.in_state
+        options['out_state'] = VIC_STATE_PREFIX.format(**wildcards)
         options['stateyear'] = options['endyear']
         options['statemonth'] = options['endmonth']
         options['stateday'] = options['endday']
@@ -461,7 +477,7 @@ rule config_vic:
         else:
             kwargs = dict(wildcards)
             kwargs['scen'] = 'hist'
-            options['init_state'] = 'INIT_STATE ' + VIC_STATE.format(
+            options['init_state'] = 'INIT_STATE ' + input.in_state.format(
                 **kwargs)
 
         with open(input.template, 'r') as f:
@@ -485,7 +501,8 @@ rule run_vic:
             '{outstep}', 'daily'),
         HYDRO_OUTPUT.replace('{model_id}', 'vic').replace(
             '{outstep}', 'monthly'),
-        VIC_STATE
+        state = VIC_STATE
+    benchmark: BENCHMARK
     log:
         NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     run:
@@ -505,6 +522,16 @@ rule run_vic:
             # rename
             print('%s-->%s' % (infile, outfile), flush=True)
             shutil.move(infile, outfile)
+
+        # rename output state (just dropping the date-string)
+        try:
+            infile = glob.glob(VIC_STATE_PREFIX.format(**wildcards) + '*.nc')[0]
+        except IndexError:
+            raise IndexError(VIC_STATE_PREFIX.format(**wildcards) + '*.nc',
+                             'failed to return a valid state file')
+        outfile = output.state
+        print('%s-->%s' % (infile, outfile), flush=True)
+        shutil.move(infile, outfile)
 
 
 # forcings: /glade/p/ral/RHAP/naoki/storylines/prms/project/analog_regression_1.NCAR_WRF_50km.access13.hist/r1/input/analog_regression_1.NCAR_WRF_50km.access13.hist_1.data
@@ -526,18 +553,16 @@ rule config_prms:
         options['param_file'] = config['HYDROLOGY'][wildcards.model]['parameters']
         options['forcing'] = input.forcing
         options['write_state_file'] = 1
-        options['output_state'] = PRMS_STATE.format(
-            year=options['endyear'], **wildcards)
+        options['output_state'] = PRMS_STATE.format(**wildcards)
 
         if wildcards.scen == 'hist':
             options['use_init_state_file'] = 0
+            options['input_state'] = NULL_STATE
         else:
             options['use_init_state_file'] = 1
-        state_kws = dict(wildcards)
-        state_kws['scen'] = 'hist'
-        options['input_state'] = PRMS_STATE.format(
-            year=config['SCEN_YEARS'][wildcards.scen]['start'] - 1,
-            **state_kws)
+            state_kws = dict(wildcards)
+            state_kws['scen'] = 'hist'
+            options['input_state'] = PRMS_STATE.format(**state_kws)
 
         with open(input.template, 'r') as f:
             template = f.read()
@@ -563,10 +588,13 @@ runoff 1
 rule run_prms:
     input:
         PRMS_FORCINGS,
+        prms_init_state,
         config = HYDRO_CONFIG.replace('{model_id}', 'prms'),
         prms_exe = hydro_executable
     output:
-        PRMS_OUTPUT
+        PRMS_OUTPUT,
+        PRMS_STATE
+    benchmark: BENCHMARK
     log:
         NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     shell:
@@ -581,6 +609,7 @@ rule post_process_prms:
             '{outstep}', 'daily'),
         monthly = HYDRO_OUTPUT.replace('{model_id}', 'prms').replace(
             '{outstep}', 'monthly')
+    benchmark: BENCHMARK
     run:
         import xarray as xr
         from prms import read_grid_file, extract_nc
@@ -636,6 +665,7 @@ rule downscaling:
         temp(DOWNSCALING_DATA)
     threads: 36
     log: NOW.strftime(DOWNSCALING_LOG)
+    benchmark: BENCHMARK
     run:
 
         logging.basicConfig(filename=str(log), level=logging.DEBUG)
@@ -664,6 +694,7 @@ rule run_metsim:
     log: NOW.strftime(DISAGG_LOG)
     threads: 36
     # conda: "envs/metsim.yaml"
+    benchmark: BENCHMARK
     shell: "/glade/u/home/jhamman/anaconda/envs/storylines/bin/ms -n {threads} {input.config} > {log} 2>&1"
 
 rule config_metsim:
