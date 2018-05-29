@@ -419,12 +419,11 @@ rule disagg_methods:
          for scen in config['SCENARIOS']]
 
 
-
 rule rename_hydro_forcings_for_vic:
     input: DISAGG_OUTPUT
     output: temp(VIC_FORCING)
     shell:
-        "ln -s {input} {output}"
+        "ln -sr {input} {output}"
 
 
 rule reformat_prms_forcings:
