@@ -1,15 +1,14 @@
-
 GCMS:
-  # # - ACCESS1-3 (missing in bcsd)
+  # - ACCESS1-3 (missing in bcsd)
   - CanESM2
   - CCSM4
   - CNRM-CM5
   - GFDL-CM3
-  # # - IPSL-CM5A-MR
+  # - IPSL-CM5A-MR (missing rcp85 in bcsd)
   - MIROC5
   - MRI-CGCM3
   - NorESM1-M
-  # # - giss (missing rcp85)
+  # - giss (missing rcp85)
 SCENARIOS:
   - hist
   - rcp45
@@ -30,6 +29,15 @@ HYDRO_METHODS:
 ROUTING_METHODS:
   - mizuroute  # placeholder
 SCEN_YEARS:
+  # hist:
+  #   start: 2003
+  #   stop: 2005
+  # rcp45:
+  #   start: 2006
+  #   stop: 2008
+  # rcp85:
+  #   start: 2006
+  #   stop: 2008
   hist:
     start: 1953
     stop: 2005
@@ -39,6 +47,9 @@ SCEN_YEARS:
   rcp85:
     start: 2006
     stop: 2099
+  obs_hist:
+    start: 1981
+    stop: 2005
 
 # Cluster configuration
 machine: cheyenne
@@ -49,28 +60,31 @@ __default__:
   walltime: 00:30:00
   select: 1
 downscaling:
-  queue: economy
+  queue: regular
   select: 1:ncpus=36:mem=109GB
 reformat_prms_forcings:
-  queue: economy
+  queue: regular
   select: 1:ncpus=36:mem=109GB
 run_metsim:
   queue: economy
-  walltime: 01:00:00
+  walltime: 02:00:00
   select: 1:ncpus=36:mpiprocs=36:mem=109GB
 run_vic:
-  queue: economy
+  queue: regular
   walltime: 12:00:00
   select: 1:ncpus=36:mpiprocs=36
 run_prms:
+  queue: regular
+  select: 1:ncpus=36
   walltime: 03:00:00
 
-domain: /glade/p/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
+domain: /glade/p_old/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
 
 
 # Configuration settings for each method
 DISAGG:
   metsim:
+    executable: /glade/u/home/jhamman/anaconda/envs/storylines/bin/ms
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
     1440:
       out_vars:
@@ -94,29 +108,57 @@ DISAGG:
 # A 'model' is the combination of an executable, parameters, and config options
 HYDROLOGY:
   vic_mpr:
-    executable: /glade2/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade2/work/jhamman/storylines/data/vic_params/mpr_0.125deg.vic_parameters.qc.nc
+    executable: /glade/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    parameters: /glade/work/jhamman/storylines/data/vic_params/mpr_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
     baseflow: NIJSSEN2001
   vic_default:
-    executable: /glade2/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
-    parameters: /glade2/work/jhamman/storylines/data/vic_params/maurer_0.125deg.vic_parameters.qc.nc
+    executable: /glade/work/jhamman/storylines/src/VIC/vic/drivers/image/vic_image.exe
+    parameters: /glade/work/jhamman/storylines/data/vic_params/maurer_0.125deg.vic_parameters.qc.nc
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/vic.template.cfg
     force_timestep: 60
     baseflow: ARNO
   prms_default:
-    executable: /glade2/work/jhamman/storylines/src/PRMS_V/bin
-    parameters: /glade/p/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
+    executable: /glade/work/jhamman/storylines/src/PRMS_V/bin/prmsv
+    parameters: /glade/p_old/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
     data_file: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_data_file.txt
-    grid_file: /glade/p/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt
+    grid_file: /glade/p_old/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt
     force_timestep: 1440
 
 
+OBS_FORCING:
+  livneh:
+    data: /glade/scratch/jhamman/GARD_inputs/livneh2014.1_16deg/8th/livneh_NAmerExt_15Oct2014.{year}*.nc
+    variables:
+      lat: latitude
+      lon: longitude
+      prec: Prec
+      t_max: Tmax
+      t_min: Tmin
+      wind: wind
+  maurer:
+    data: /glade/p_old/ral/RHAP/jhamman/inputdata/metdata/maurer/*/nldas_met_update.obs.daily.*.{year}.nc
+    variables:
+      lat: lat
+      lon: lon
+      prec: pr
+      t_max: tasmax
+      t_min: tasmin
+  newman:
+    data: /glade/scratch/jhamman/GARD_inputs/newman_ensemble/conus_ens_002.nc
+    # mems: [000, 001, 002, 003, 004]  # TODO
+    variables:
+      lat: lat
+      lon: lon
+      prec: pcp
+      t_max: t_max
+      t_min: t_min
+
 DOWNSCALING:
   icar:
-    data: /glade/p/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
+    data: /glade/p_old/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access13: ACCESS1-3
       canesm: CanESM2
