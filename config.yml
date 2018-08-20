@@ -127,6 +127,10 @@ HYDROLOGY:
     grid_file: /glade/p_old/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt
     force_timestep: 1440
 
+ROUTING:
+  mizuroute:
+    ancil_dir: TODO
+    fname_ntopOld: TODO
 
 OBS_FORCING:
   livneh:
