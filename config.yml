@@ -131,6 +131,8 @@ ROUTING:
   mizuroute:
     ancil_dir: TODO
     fname_ntopOld: TODO
+    fname_ntopNew: TODO
+    param_nml: TODO
 
 OBS_FORCING:
   livneh:
