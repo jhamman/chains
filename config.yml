@@ -2,27 +2,27 @@ GCMS:
   # - ACCESS1-3 (missing in bcsd)
   - CanESM2
   - CCSM4
-  - CNRM-CM5
-  - GFDL-CM3
-  # - IPSL-CM5A-MR (missing rcp85 in bcsd)
-  - MIROC5
-  - MRI-CGCM3
-  - NorESM1-M
-  # - giss (missing rcp85)
+  # - CNRM-CM5
+  # - GFDL-CM3
+  # # - IPSL-CM5A-MR (missing rcp85 in bcsd)
+  # - MIROC5
+  # - MRI-CGCM3
+  # - NorESM1-M
+  # # - giss (missing rcp85)
 SCENARIOS:
   - hist
-  - rcp45
+  # - rcp45
   - rcp85
 DOWNSCALING_METHODS:
   - bcsd
-  - loca
+  # - loca
   - icar
   # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
   vic_mpr: vic
-  vic_default: vic
+  # vic_default: vic
   prms_default: prms
   # - fuse  # placeholder
   # - summa  # placeholder
@@ -129,6 +129,7 @@ HYDROLOGY:
 
 ROUTING:
   mizuroute:
+    template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/mizuroute.template.cfg
     ancil_dir: TODO
     fname_ntopOld: TODO
     fname_ntopNew: TODO

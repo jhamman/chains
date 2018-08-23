@@ -123,14 +123,15 @@ PRMS_STATE = os.path.join(
     HYDRO_OUT_DIR, 'state.prms.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.bin')
 
 # Routing
-ROTUE_OUT_DIR = os.path.join(CASEDIR, 'routing_data')
+ROUTE_OUT_DIR = os.path.join(CASEDIR, 'routing_data')
 MIZUROUTE_STATE = os.path.join(
-    ROTUE_OUT_DIR, 'state.mizuroute.{gcm}.{scen}.{dsm}.{disagg_method}.{model}')
+    ROUTE_OUT_DIR, 'state.mizuroute.{gcm}.{scen}.{dsm}.{disagg_method}.{model}')
 MIZUROUTE_CONFIG = os.path.join(
     CONFIGS_DIR, 'config.mizuroute.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.txt')
 ROUTE_LOG = os.path.join(
     CASEDIR, 'logs', 'routing.mizuroute.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.%Y%m%d-%H%M%d.log.txt')
-
+ROUTE_OUTPUT_FNAME = 'hist.mizuroute.{gcm}.{scen}.{dsm}.{disagg_method}.{model}.{outstep}.nc'
+ROUTE_OUTPUT = os.path.join(ROUTE_OUT_DIR, ROUTE_OUTPUT_FNAME)
 # Dummy files
 NULL_STATE = 'null_state'  # for runs that don't get an initial state file
 
@@ -152,6 +153,7 @@ include: "downscaling.snakefile"
 include: "metsim.snakefile"
 include: "vic.snakefile"
 include: "prms.snakefile"
+include: "mizuroute.snakefile"
 
 # readme / logs
 rule readme:
@@ -228,7 +230,6 @@ rule hydrology_models:
                outstep=['daily', 'monthly'])
 
 
-# Hydrologic Models
 rule hydrology_models_obs:
     input:
         expand(HYDRO_OUTPUT, filtered_product,
@@ -241,27 +242,35 @@ rule hydrology_models_obs:
 
 
 # Routing Models
+rule config_routing_models:
+    input:
+        expand(MIZUROUTE_CONFIG, filtered_product,
+               gcm=config['GCMS'], scen=config['SCENARIOS'],
+               disagg_method=config['DISAGG_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'],
+               model=list(config['HYDRO_METHODS'].keys()),
+               model_id=set(config['HYDRO_METHODS'].values()))
+
 rule routing_models:
-   input:
-       expand(ROUTE_OUTPUT, filtered_product,
-              gcm=config['GCMS'], scen=config['SCENARIOS'],
-              disagg_method=config['DISAGG_METHODS'],
-              dsm=config['DOWNSCALING_METHODS'],
-              model=list(config['HYDRO_METHODS'].keys()),
-              model_id=set(config['HYDRO_METHODS'].values()),
-              outstep=['daily', 'monthly'])
+    input:
+        expand(ROUTE_OUTPUT, filtered_product,
+               gcm=config['GCMS'], scen=config['SCENARIOS'],
+               disagg_method=config['DISAGG_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'],
+               model=list(config['HYDRO_METHODS'].keys()),
+               model_id=set(config['HYDRO_METHODS'].values()),
+               outstep=['daily', 'monthly'])
 
 
-# Routing Models
 rule routing_models_obs:
-   input:
-       expand(ROUTE_OUTPUT, filtered_product,
-              gcm=['obs'], scen=['obs_hist'],
-              dsm=config['OBS_FORCING'].keys(),
-              disagg_method=config['DISAGG_METHODS'],
-              model=list(config['HYDRO_METHODS'].keys()),
-              model_id=set(config['HYDRO_METHODS'].values()),
-              outstep=['daily', 'monthly'])
+    input:
+        expand(ROUTE_OUTPUT, filtered_product,
+               gcm=['obs'], scen=['obs_hist'],
+               dsm=config['OBS_FORCING'].keys(),
+               disagg_method=config['DISAGG_METHODS'],
+               model=list(config['HYDRO_METHODS'].keys()),
+               model_id=set(config['HYDRO_METHODS'].values()),
+               outstep=['daily', 'monthly'])
 
 
 # Disaggregation methods
