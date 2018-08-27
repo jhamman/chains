@@ -32,7 +32,7 @@ rule run_metsim:
         state = metsim_state
     output: DISAGG_OUTPUT
     log: NOW.strftime(DISAGG_LOG)
-    threads: 36
+    threads: 12
     # conda: "envs/metsim.yaml"
     # benchmark: BENCHMARK
     # TODO: remove exe path

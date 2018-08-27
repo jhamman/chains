@@ -177,7 +177,7 @@ rule setup_casedirs:
                          routing_methods=config['ROUTING_METHODS'])
 
 
-def filter_combinator(combinator, blacklist):
+def filter_combinator(combinator):
     # https://stackoverflow.com/a/41185568/1757464
     def filtered_combinator(*args, **kwargs):
         for wc_comb in combinator(*args, **kwargs):
@@ -186,15 +186,16 @@ def filter_combinator(combinator, blacklist):
             # unpredictable wildcard order
             d = dict(wc_comb)
             if d['model_id'] in d['model']:
-                yield frozenset(wc_comb)
-            # if frozenset(wc_comb) not in blacklist:
-            #
-            #     yield wc_comb
+                if 'obs' in d['scen']:
+                    yield frozenset(wc_comb)
+                elif d['gcm'] in config['DOWNSCALING'][d['dsm']]['gcms'].values():
+                    yield frozenset(wc_comb)
+                else:
+                    pass
     return filtered_combinator
 
 
-blacklist = []  # TODO filter out missing gcms (or implement a subselection method)
-filtered_product = filter_combinator(product, blacklist)
+filtered_product = filter_combinator(product)
 
 
 rule config_hydro_models:

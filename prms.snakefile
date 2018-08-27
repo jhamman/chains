@@ -129,7 +129,10 @@ rule post_process_prms:
 
         grid_df = read_grid_file(grid_file).set_index(['lat', 'lon'])
 
-        ds = xr.open_dataset(input[0])
+        ds = xr.open_dataset(input[0], decode_cf=False)
+        if 'missing_value' in ds['time'].attrs:
+            del ds['time'].attrs['missing_value']
+        ds = xr.decode_cf(ds)
 
         # invert the hru mapping
         ds.coords['hru_id'] = grid_df.index

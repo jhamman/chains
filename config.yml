@@ -1,28 +1,50 @@
 GCMS:
-  # - ACCESS1-3 (missing in bcsd)
+  - ACCESS1-0
+  - ACCESS1-3
+  - BCC-CSM1-1
+  - BCC-CSM1-1-M
   - CanESM2
   - CCSM4
-  # - CNRM-CM5
-  # - GFDL-CM3
-  # # - IPSL-CM5A-MR (missing rcp85 in bcsd)
-  # - MIROC5
-  # - MRI-CGCM3
-  # - NorESM1-M
-  # # - giss (missing rcp85)
+  - CESM1-BGC
+  - CESM1-CAM5
+  - CMCC-CM
+  - CMCC-CMS
+  - CNRM-CM5
+  - CSIRO-Mk3.6.0
+  - EC-EARTH
+  - FGOALS-g2
+  - GFDL-CM3
+  - GFDL-ESM2G
+  - GFDL-ESM2M
+  - GISS-E2-H
+  - GISS-E2-R
+  - HadGEM2-AO
+  - HadGEM2-CC
+  - HadGEM2-ES
+  - INM-CM4
+  - IPSL-CM5A-LR
+  - IPSL-CM5A-MR
+  - MIROC5
+  - MIROC-ESM
+  - MIROC-ESM-CHEM
+  - MPI-ESM-LR
+  - MPI-ESM-MR
+  - MRI-CGCM3
+  - NorESM1-M
 SCENARIOS:
   - hist
-  # - rcp45
+  - rcp45
   - rcp85
 DOWNSCALING_METHODS:
   - bcsd
-  # - loca
+  - loca
   - icar
   # - gard  # placeholder
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
   vic_mpr: vic
-  # vic_default: vic
+  vic_default: vic
   prms_default: prms
   # - fuse  # placeholder
   # - summa  # placeholder
@@ -38,6 +60,9 @@ SCEN_YEARS:
   # rcp85:
   #   start: 2006
   #   stop: 2008
+  # obs_hist:
+  #   start: 2003
+  #   stop: 2005
   hist:
     start: 1953
     stop: 2005
@@ -60,25 +85,25 @@ __default__:
   walltime: 00:30:00
   select: 1
 downscaling:
-  queue: regular
+  queue: premium
   select: 1:ncpus=36:mem=109GB
 reformat_prms_forcings:
-  queue: regular
+  queue: premium
   select: 1:ncpus=36:mem=109GB
 run_metsim:
-  queue: economy
+  queue: premium
   walltime: 02:00:00
-  select: 1:ncpus=36:mpiprocs=36:mem=109GB
+  select: 1:ncpus=36:mpiprocs=1:ompthreads=1:mem=109GB
 run_vic:
-  queue: regular
+  queue: premium
   walltime: 12:00:00
-  select: 1:ncpus=36:mpiprocs=36
+  select: 1:ncpus=36:mpiprocs=36:ompthreads=1
 run_prms:
-  queue: regular
+  queue: premium
   select: 1:ncpus=36
   walltime: 03:00:00
 
-domain: /glade/p_old/ral/RHAP/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
+domain: /glade/p/ral/hap/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
 
 
 # Configuration settings for each method
@@ -121,10 +146,10 @@ HYDROLOGY:
     baseflow: ARNO
   prms_default:
     executable: /glade/work/jhamman/storylines/src/PRMS_V/bin/prmsv
-    parameters: /glade/p_old/ral/RHAP/naoki/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
+    parameters: /glade/p/ral/hap/mizukami/storylines/prms/scripts/preprocess/project/nldas_prms_conus12k.wpar
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms.template.cfg
     data_file: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/prms_data_file.txt
-    grid_file: /glade/p_old/ral/RHAP/naoki/storylines/prms/project/nldas_prms_conus12k_hruid.txt
+    grid_file: /glade/p/ral/hap/mizukami/storylines/prms/project/nldas_prms_conus12k_hruid.txt
     force_timestep: 1440
 
 ROUTING:
@@ -137,7 +162,7 @@ ROUTING:
 
 OBS_FORCING:
   livneh:
-    data: /glade/scratch/jhamman/GARD_inputs/livneh2014.1_16deg/8th/livneh_NAmerExt_15Oct2014.{year}*.nc
+    data: /glade/p/ral/hap/common_data/Livneh_met/livneh2014.1_16deg/8th/livneh_NAmerExt_15Oct2014.{year}*.nc
     variables:
       lat: latitude
       lon: longitude
@@ -146,7 +171,7 @@ OBS_FORCING:
       t_min: Tmin
       wind: wind
   maurer:
-    data: /glade/p_old/ral/RHAP/jhamman/inputdata/metdata/maurer/*/nldas_met_update.obs.daily.*.{year}.nc
+    data: /glade/p/ral/hap/common_data/Maurer_met/*/nldas_met_update.obs.daily.*.{year}.nc
     variables:
       lat: lat
       lon: lon
@@ -154,7 +179,7 @@ OBS_FORCING:
       t_max: tasmax
       t_min: tasmin
   newman:
-    data: /glade/scratch/jhamman/GARD_inputs/newman_ensemble/conus_ens_002.nc
+    data: /glade2/scratch2/jhamman/GARD_inputs/newman_ensemble/conus_ens_002.nc
     # mems: [000, 001, 002, 003, 004]  # TODO
     variables:
       lat: lat
@@ -165,7 +190,7 @@ OBS_FORCING:
 
 DOWNSCALING:
   icar:
-    data: /glade/p_old/ral/RHAP/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
+    data: /glade/p/ral/hap/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access13: ACCESS1-3
       canesm: CanESM2
@@ -184,7 +209,7 @@ DOWNSCALING:
       t_max: t_max
       t_min: t_min
   bcsd:
-    data: /glade/u/home/jhamman/workdir/reruns/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc
+    data: /glade/p/ral/hap/common_data/BCSD/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access1-0: ACCESS1-0
       bcc-csm1-1-m: BCC-CSM1-1-M
@@ -208,7 +233,7 @@ DOWNSCALING:
       hadgem2-cc: HadGEM2-CC
       hadgem2-es: HadGEM2-ES
       inmcm4: INM-CM4
-      ipsl-cm5a-mr: IPSL-CM5A-MR
+      # ipsl-cm5a-mr: IPSL-CM5A-MR
       ipsl-cm5b-lr: IPSL-CM5A-LR
       miroc5: MIROC5
       miroc-esm-chem: MIROC-ESM-CHEM
@@ -225,38 +250,38 @@ DOWNSCALING:
       t_min: tasmin
       wind: wind
   loca:
-    data: /glade/u/home/jhamman/workdir/LOCA_daily/met_data/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc
+    data: /glade/p/ral/hap/common_data/LOCA/met/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       ACCESS1-0: ACCESS1-0
       ACCESS1-3: ACCESS1-3
-      bcc-csm1-1: BCC-CSM1-1
-      bcc-csm1-1-m: BCC-CSM1-1-M
+      # bcc-csm1-1: BCC-CSM1-1  # missing rcp85
+      # bcc-csm1-1-m: BCC-CSM1-1-M  # missing rcp85
       CanESM2: CanESM2
       CCSM4: CCSM4
       CESM1-BGC: CESM1-BGC
-      CESM1-CAM5: CESM1-CAM5
-      CMCC-CM: CMCC-CM
-      CMCC-CMS: CMCC-CMS
+      # CESM1-CAM5: CESM1-CAM5  # missing rcp85
+      # CMCC-CM: CMCC-CM
+      # CMCC-CMS: CMCC-CMS  # missing rcp85
       CNRM-CM5: CNRM-CM5
-      CSIRO-Mk3-6-0: CSIRO-Mk3.6.0
-      EC-EARTH: EC-EARTH
-      FGOALS-g2: FGOALS-g2
+      # CSIRO-Mk3-6-0: CSIRO-Mk3.6.0
+      # EC-EARTH: EC-EARTH  # missing rcp45
+      # FGOALS-g2: FGOALS-g2  # missing rcp85
       GFDL-CM3: GFDL-CM3
-      GFDL-ESM2G: GFDL-ESM2G
-      GFDL-ESM2M: GFDL-ESM2M
-      GISS-E2-H: GISS-E2-H
-      GISS-E2-R: GISS-E2-R
-      HadGEM2-AO: HadGEM2-AO
-      HadGEM2-CC: HadGEM2-CC
-      HadGEM2-ES: HadGEM2-ES
-      inmcm4: INM-CM4
-      IPSL-CM5A-LR: IPSL-CM5A-LR
-      IPSL-CM5A-MR: IPSL-CM5A-MR
+      # GFDL-ESM2G: GFDL-ESM2G  # missing rcp85
+      # GFDL-ESM2M: GFDL-ESM2M
+      # GISS-E2-H: GISS-E2-H  # missing rcp45
+      # GISS-E2-R: GISS-E2-R
+      # HadGEM2-AO: HadGEM2-AO
+      # HadGEM2-CC: HadGEM2-CC
+      # HadGEM2-ES: HadGEM2-ES  # missing rcp85
+      # inmcm4: INM-CM4
+      # IPSL-CM5A-LR: IPSL-CM5A-LR
+      # IPSL-CM5A-MR: IPSL-CM5A-MR
       MIROC5: MIROC5
-      MIROC-ESM: MIROC-ESM
-      MIROC-ESM-CHEM: MIROC-ESM-CHEM
-      MPI-ESM-LR: MPI-ESM-LR
-      MPI-ESM-MR: MPI-ESM-MR
+      # MIROC-ESM: MIROC-ESM  # missing rcp85
+      # MIROC-ESM-CHEM: MIROC-ESM-CHEM  # missing rcp85
+      # MPI-ESM-LR: MPI-ESM-LR  # missing rcp85
+      # MPI-ESM-MR: MPI-ESM-MR  # missing rcp85
       MRI-CGCM3: MRI-CGCM3
       NorESM1-M: NorESM1-M
     variables:

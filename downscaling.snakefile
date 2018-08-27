@@ -113,7 +113,8 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         dim='time', limit=2)
     # fill in missing days at the end or begining of the record
     if ds.dims['time'] != len(dates):
-        ds = ds.reindex(time=dates, method='ffill')
+        ds = ds.reindex(time=dates, method='ffill', copy=False).reindex(
+            time=dates, method='nearest', copy=False)
 
     # TODO, update time encoding to use common units for all files
     ds.to_netcdf(output_file, engine='h5netcdf',
