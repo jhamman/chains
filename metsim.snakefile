@@ -3,15 +3,13 @@ localrules: config_metsim
 
 
 def metsim_state(wcs):
-    year = int(wcs.year)
     scen = wcs.scen
-    if 'rcp' in scen and year == 2006:
+    if 'rcp' in scen:
         scen = 'hist'
-    if wcs.dsm == 'bcsd' and scen == 'hist' and year == 2006:
+    if wcs.dsm == 'bcsd' and scen == 'hist':
         scen = 'rcp45'
 
-    state = DOWNSCALING_DATA.format(dsm=wcs.dsm, gcm=wcs.gcm, scen=scen,
-                                    year=year - 1)
+    state = DOWNSCALING_DATA.format(dsm=wcs.dsm, gcm=wcs.gcm, scen=scen)
 
     return state
 
@@ -24,19 +22,44 @@ def maybe_make_cfg_list(obj):
     return '%s' % ', '.join(obj)
 
 
+# rule run_metsim_obs:
+#     input:
+#         readme = README,
+#         config = DISAGG_CONFIG,
+#         forcing = DOWNSCALING_DATA,
+#         state = metsim_state
+#     output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1981, 'stop': 2005})]
+#     log: NOW.strftime(DISAGG_LOG)
+#     threads: 18
+#     # TODO: remove exe path
+#     shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+
+
 rule run_metsim:
     input:
         readme = README,
         config = DISAGG_CONFIG,
         forcing = DOWNSCALING_DATA,
         state = metsim_state
-    output: DISAGG_OUTPUT
+    output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1955, 'stop': 2005})]
     log: NOW.strftime(DISAGG_LOG)
-    threads: 12
-    # conda: "envs/metsim.yaml"
-    # benchmark: BENCHMARK
+    threads: 18
     # TODO: remove exe path
-    shell: "/glade/u/home/jhamman/anaconda/envs/storylines/bin/ms -n {threads} {input.config} > {log} 2>&1"
+    shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+
+
+rule run_metsim_rcp:
+    input:
+        readme = README,
+        config = DISAGG_CONFIG,
+        forcing = DOWNSCALING_DATA,
+        state = metsim_state
+    output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 2006, 'stop': 2099})]
+    log: NOW.strftime(DISAGG_LOG)
+    threads: 18
+    # TODO: remove exe path
+    shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+
 
 rule config_metsim:
     input:
@@ -56,10 +79,11 @@ rule config_metsim:
 
         time_step = int(wildcards.disagg_ts)
         out_vars = config['DISAGG']['metsim'][time_step]['out_vars']
-        if wildcards.dsm in config['DOWNSCALING']:
-            in_vars = config['DOWNSCALING'][wildcards.dsm]['variables']
+        dsm_type = config['DOWNSCALING_METHODS'][wildcards.dsm]
+        if dsm_type in config['DOWNSCALING']:
+            in_vars = config['DOWNSCALING'][dsm_type]['variables']
         else:
-            in_vars = config['OBS_FORCING'][wildcards.dsm]['variables']
+            in_vars = config['OBS_FORCING'][dsm_type]['variables']
 
         forcing = maybe_make_cfg_list(input.forcing)
         input_state = maybe_make_cfg_list(input.state)
@@ -76,4 +100,8 @@ rule config_metsim:
                                     out_vars=out_vars,
                                     domain=domain,
                                     time_step=time_step,
+                                    startyear=config['SCEN_YEARS'][wildcards.scen]['start'],
+                                    stopyear=config['SCEN_YEARS'][wildcards.scen]['stop'],
+                                    lat_chunk=config['DISAGG_CHUNKS']['lat'],
+                                    lon_chunk=config['DISAGG_CHUNKS']['lon'],
                                     **wildcards, **in_vars))

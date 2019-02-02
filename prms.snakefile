@@ -75,6 +75,7 @@ rule config_prms:
 
         options['out_prefix'] = PRMS_OUTPUT.format(
             **wildcards).replace('.nc', '')  # prms adds the .nc suffix
+        
         options['data_file'] = config['HYDROLOGY'][wildcards.model]['data_file']
         options['param_file'] = config['HYDROLOGY'][wildcards.model]['parameters']
         options['forcing'] = input.forcing
@@ -106,10 +107,10 @@ rule run_prms:
         PRMS_OUTPUT,
         PRMS_STATE
     # benchmark: BENCHMARK
-    log:
-        NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
+    # log:
+    #     NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     shell:
-        "{input.prms_exe} {input.config} > {log} 2>&1"
+        "{input.prms_exe} {input.config}"
 
 
 rule post_process_prms:

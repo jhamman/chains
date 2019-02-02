@@ -67,22 +67,26 @@ BENCHMARK = os.path.join(CASEDIR, 'benchmark.txt')
 # Downscaling temporary filenames
 DOWNSCALING_DIR = os.path.join(CASEDIR, 'downscaling_data')
 DOWNSCALING_DATA = os.path.join(
-    DOWNSCALING_DIR, 'downscale.{gcm}.{scen}.{dsm}.{year}.nc')
+    DOWNSCALING_DIR, 'downscale.{gcm}.{scen}.{dsm}.nc')
 DOWNSCALING_LOG = os.path.join(
     CASEDIR, 'logs',
-    'downscale.{gcm}.{scen}.{dsm}.{year}.%Y%m%d-%H%M%d.log.txt')
+    'downscale.{gcm}.{scen}.{dsm}.%Y%m%d-%H%M%d.log.txt')
 
 
 CONFIGS_DIR = os.path.join(CASEDIR, 'configs')
 
+# GARD Filenames
+GARD_CONFIG = os.path.join(
+    CONFIGS_DIR, 'config.{gcm}.{scen}.gard.{dsm}.cfg')
+
 # Metsim Filenames
 DISAGG_DIR = os.path.join(CASEDIR, 'disagg_data')
 DISAGG_CONFIG = os.path.join(
-    CONFIGS_DIR, 'config.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.{year}.cfg')
+    CONFIGS_DIR, 'config.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.cfg')
 DISAGG_LOG = os.path.join(
-    CASEDIR, 'logs', 'disagg.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.{year}.%Y%m%d-%H%M%d.log.txt')
+    CASEDIR, 'logs', 'disagg.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.%Y%m%d-%H%M%d.log.txt')
 METSIM_STATE = os.path.join(
-    DISAGG_DIR, 'state.{gcm}.{scen}.{dsm}.{disagg_method}.{year}1231.nc')
+    DISAGG_DIR, 'state.{gcm}.{scen}.{dsm}.{disagg_method}.nc')
 DISAGG_PREFIX = 'force.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}'
 DISAGG_OUTPUT = os.path.join(DISAGG_DIR,
                              DISAGG_PREFIX + '_{year}0101-{year}1231.nc')
@@ -185,10 +189,16 @@ def filter_combinator(combinator):
             # in order to accomodate
             # unpredictable wildcard order
             d = dict(wc_comb)
-            if d['model_id'] in d['model']:
+            dsm_type = config['DOWNSCALING_METHODS'][d['dsm']]
+            if ('model_id' in d) and (d['model_id'] in d['model']):
                 if 'obs' in d['scen']:
                     yield frozenset(wc_comb)
-                elif d['gcm'] in config['DOWNSCALING'][d['dsm']]['gcms'].values():
+                elif d['gcm'] in config['DOWNSCALING'][dsm_type]['gcms'].values():
+                    yield frozenset(wc_comb)
+                else:
+                    pass
+            else:
+                if d['gcm'] in config['DOWNSCALING'][dsm_type]['gcms'].values():
                     yield frozenset(wc_comb)
                 else:
                     pass
@@ -203,7 +213,7 @@ rule config_hydro_models:
         expand(HYDRO_CONFIG, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
-               dsm=config['DOWNSCALING_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'].keys(),
                model=list(config['HYDRO_METHODS'].keys()),
                model_id=set(config['HYDRO_METHODS'].values()))
 
@@ -212,7 +222,7 @@ rule make_vic_forcings:
         [expand(VIC_FORCING, filtered_product,
                 gcm=config['GCMS'], scen=scen,
                 disagg_method=config['DISAGG_METHODS'],
-                dsm=config['DOWNSCALING_METHODS'],
+                dsm=config['DOWNSCALING_METHODS'].keys(),
                 model=list(config['HYDRO_METHODS'].keys()),
                 disagg_ts=['60'],
                 model_id=set(config['HYDRO_METHODS'].values()),
@@ -225,21 +235,21 @@ rule hydrology_models:
         expand(HYDRO_OUTPUT, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
-               dsm=config['DOWNSCALING_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'].keys(),
                model=list(config['HYDRO_METHODS'].keys()),
                model_id=set(config['HYDRO_METHODS'].values()),
                outstep=['daily', 'monthly'])
 
 
-rule hydrology_models_obs:
-    input:
-        expand(HYDRO_OUTPUT, filtered_product,
-               gcm=['obs'], scen=['obs_hist'],
-               dsm=config['OBS_FORCING'].keys(),
-               disagg_method=config['DISAGG_METHODS'],
-               model=list(config['HYDRO_METHODS'].keys()),
-               model_id=set(config['HYDRO_METHODS'].values()),
-               outstep=['daily', 'monthly'])
+# rule hydrology_models_obs:
+#     input:
+#         expand(HYDRO_OUTPUT, filtered_product,
+#                gcm=['obs'], scen=['obs_hist'],
+#                dsm=config['OBS_FORCING'].keys(),
+#                disagg_method=config['DISAGG_METHODS'],
+#                model=list(config['HYDRO_METHODS'].keys()),
+#                model_id=set(config['HYDRO_METHODS'].values()),
+#                outstep=['daily', 'monthly'])
 
 
 # Routing Models
@@ -248,7 +258,7 @@ rule config_routing_models:
         expand(MIZUROUTE_CONFIG, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
-               dsm=config['DOWNSCALING_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'].keys(),
                model=list(config['HYDRO_METHODS'].keys()),
                model_id=set(config['HYDRO_METHODS'].values()))
 
@@ -257,52 +267,73 @@ rule routing_models:
         expand(ROUTE_OUTPUT, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
-               dsm=config['DOWNSCALING_METHODS'],
+               dsm=config['DOWNSCALING_METHODS'].keys(),
                model=list(config['HYDRO_METHODS'].keys()),
                model_id=set(config['HYDRO_METHODS'].values()),
                outstep=['daily', 'monthly'])
 
 
-rule routing_models_obs:
-    input:
-        expand(ROUTE_OUTPUT, filtered_product,
-               gcm=['obs'], scen=['obs_hist'],
-               dsm=config['OBS_FORCING'].keys(),
-               disagg_method=config['DISAGG_METHODS'],
-               model=list(config['HYDRO_METHODS'].keys()),
-               model_id=set(config['HYDRO_METHODS'].values()),
-               outstep=['daily', 'monthly'])
+# rule routing_models_obs:
+#     input:
+#         expand(ROUTE_OUTPUT, filtered_product,
+#                gcm=['obs'], scen=['obs_hist'],
+#                dsm=config['OBS_FORCING'].keys(),
+#                disagg_method=config['DISAGG_METHODS'],
+#                model=list(config['HYDRO_METHODS'].keys()),
+#                model_id=set(config['HYDRO_METHODS'].values()),
+#                outstep=['daily', 'monthly'])
 
 
-# Disaggregation methods
+# Downscaling methods
 rule downscaling_data:
     input:
-        [expand(DOWNSCALING_DATA,
+        expand(DOWNSCALING_DATA, filtered_product,
+               gcm=config['GCMS'], scen=config['SCENARIOS'],
+               dsm=config['DOWNSCALING_METHODS'])
+
+rule gard_configs:
+    input:
+        [expand(GARD_CONFIG,
                 gcm=config['GCMS'], scen=scen,
-                dsm=config['DOWNSCALING_METHODS'],
-                year=get_year_range(config['SCEN_YEARS'][scen]))
+                dsm=config['DOWNSCALING']['gard']['methods'])
          for scen in config['SCENARIOS']]
 
+# Disaggregation methods
 rule disagg_configs:
     input:
-        [expand(DISAGG_CONFIG,
-                gcm=config['GCMS'], scen=scen,
-                dsm=config['DOWNSCALING_METHODS'],
+        expand(DISAGG_CONFIG, filtered_product,
+                gcm=config['GCMS'], scen=config['SCENARIOS'],
+                dsm=config['DOWNSCALING_METHODS'].keys(),
                 disagg_ts=[60, 1440],
-                disagg_method=config['DISAGG_METHODS'],
-                year=get_year_range(config['SCEN_YEARS'][scen]))
-         for scen in config['SCENARIOS']]
+                disagg_method=config['DISAGG_METHODS'])
+
+# rule disagg_configs_obs:
+#     input:
+#         expand(DISAGG_CONFIG,
+#                gcm=['obs'], scen=['obs_hist'],
+#                dsm=config['OBS_FORCING'].keys(),
+#                disagg_ts=[60, 1440],
+#                disagg_method=config['DISAGG_METHODS'])
 
 rule disagg_methods:
     input:
-        [expand(DISAGG_OUTPUT,
+        [expand(DISAGG_OUTPUT, filtered_product,
                 gcm=config['GCMS'], scen=scen,
-                dsm=config['DOWNSCALING_METHODS'],
+                dsm=config['DOWNSCALING_METHODS'].keys(),
                 disagg_ts=[60, 1440],
                 disagg_method=config['DISAGG_METHODS'],
                 year=get_year_range(config['SCEN_YEARS'][scen]))
          for scen in config['SCENARIOS']]
 
+
+# rule disagg_methods_obs:
+#     input:
+#         expand(DISAGG_OUTPUT,
+#                gcm=['obs'], scen=['obs_hist'],
+#                dsm=config['OBS_FORCING'].keys(),
+#                disagg_ts=[60, 1440],
+#                disagg_method=config['DISAGG_METHODS'],
+#                year=get_year_range(config['SCEN_YEARS']['obs_hist']))
 
 
 rule dummy_state:

@@ -2,7 +2,7 @@ import os
 import shutil
 
 
-localrules: config_vic, rename_hydro_forcings_for_vic,
+localrules: config_vic,
 
 
 def vic_init_state(wcs):
@@ -21,7 +21,7 @@ rule rename_hydro_forcings_for_vic:
     input: DISAGG_OUTPUT
     output: temp(VIC_FORCING)
     shell:
-        "ln -sr {input} {output}"
+        "module load nco && time ncks --no_tmp_fl --cnk_dmn time,1 --cnk_dmn lat,224 --cnk_dmn lon,464 {input} {output}"
 
 
 rule config_vic:
@@ -81,12 +81,12 @@ rule run_vic:
             '{outstep}', 'monthly'),
         state = VIC_STATE
     # benchmark: BENCHMARK
-    log:
-        NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
+    # log:
+    #     NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     run:
         # run VIC
         # TODO: the -n 36 should go away at some point
-        shell("module load intel impi netcdf && mpirun -n 36 {input.vic_exe} -g {input.config} > {log} 2>&1")
+        shell("module load intel impi netcdf && mpirun -n 36 {input.vic_exe} -g {input.config}")
 
         # rename output files
         for freq, end in [('daily', '.daily.{:4d}-01-01.nc'),

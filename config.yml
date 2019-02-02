@@ -1,34 +1,32 @@
 GCMS:
-  - ACCESS1-0
+# "access13" "canesm" "cesm" "gfdl" "miroc5" "mri" "noresm"
   - ACCESS1-3
-  - BCC-CSM1-1
-  - BCC-CSM1-1-M
   - CanESM2
   - CCSM4
   - CESM1-BGC
   - CESM1-CAM5
-  - CMCC-CM
-  - CMCC-CMS
-  - CNRM-CM5
-  - CSIRO-Mk3.6.0
-  - EC-EARTH
-  - FGOALS-g2
+    #  - CMCC-CM
+    #  - CMCC-CMS
+    #  - CNRM-CM5
+    #  - CSIRO-Mk3.6.0
+    #  - EC-EARTH
+    #  - FGOALS-g2
   - GFDL-CM3
-  - GFDL-ESM2G
-  - GFDL-ESM2M
-  - GISS-E2-H
-  - GISS-E2-R
-  - HadGEM2-AO
-  - HadGEM2-CC
-  - HadGEM2-ES
-  - INM-CM4
-  - IPSL-CM5A-LR
-  - IPSL-CM5A-MR
+    #  - GFDL-ESM2G
+    #  - GFDL-ESM2M
+    # - GISS-E2-H
+    # - GISS-E2-R
+    # - HadGEM2-AO
+    # - HadGEM2-CC
+    # - HadGEM2-ES
+    # - INM-CM4
+    # - IPSL-CM5A-LR
+    # - IPSL-CM5A-MR
   - MIROC5
-  - MIROC-ESM
-  - MIROC-ESM-CHEM
-  - MPI-ESM-LR
-  - MPI-ESM-MR
+    # - MIROC-ESM
+    # - MIROC-ESM-CHEM
+    # - MPI-ESM-LR
+    # - MPI-ESM-MR
   - MRI-CGCM3
   - NorESM1-M
 SCENARIOS:
@@ -36,10 +34,13 @@ SCENARIOS:
   - rcp45
   - rcp85
 DOWNSCALING_METHODS:
-  - bcsd
-  - loca
-  - icar
-  # - gard  # placeholder
+  # bcsd: bcsd
+  loca: loca
+  icar: icar
+  pass_through: gard
+  analog_regression_2: gard
+  pure_analog_2: gard
+  pure_regression_0: gard
 DISAGG_METHODS:
   - metsim
 HYDRO_METHODS:
@@ -61,10 +62,10 @@ SCEN_YEARS:
   #   start: 2006
   #   stop: 2008
   # obs_hist:
-  #   start: 2003
-  #   stop: 2005
+  #    start: 2003
+     # stop: 2005
   hist:
-    start: 1953
+    start: 1955
     stop: 2005
   rcp45:
     start: 2006
@@ -75,33 +76,67 @@ SCEN_YEARS:
   obs_hist:
     start: 1981
     stop: 2005
+DISAGG_CHUNKS:
+  lat: 1
+  lon: 464
 
+# # Cluster configuration
+# machine: cheyenne
+# workdir: /gpfs/flash/jhamman/storylines_ensemble/
+# __default__:
+#   account: P48500028
+#   queue: share
+#   walltime: 00:30:00
+#   select: 1
+# downscaling:
+#   queue: premium
+#   select: 1:ncpus=36:mem=109GB
+# reformat_prms_forcings:
+#   queue: premium
+#   select: 1:ncpus=36:mem=109GB
+# run_metsim:
+#   queue: premium
+#   walltime: 02:00:00
+#   select: 1:ncpus=36:mpiprocs=1:ompthreads=1:mem=109GB
+# run_vic:
+#   queue: premium
+#   walltime: 12:00:00
+#   select: 1:ncpus=36:mpiprocs=36:ompthreads=1
+# run_prms:
+#   queue: premium
+#   select: 1:ncpus=36
+#   walltime: 03:00:00
+
+
+# snakemake hydrology_models --jobs 5000 --local-cores 1 --cluster-config config.yml --cluster "{cluster.submit_cmd} {cluster.walltime} {cluster.resources} {cluster.account} {cluster.queue}" --jobname {rulename}.{jobid}.sh --latency-wait 30 -p --keep-going --ignore-incomplete --notemp --max-jobs-per-second 2 --jobscript jobscript.sh
 # Cluster configuration
-machine: cheyenne
+machine: cheyenne_dav
 workdir: /gpfs/flash/jhamman/storylines_ensemble/
 __default__:
-  account: P48500028
-  queue: share
-  walltime: 00:30:00
-  select: 1
+  submit_cmd: qsub -j oe
+  account: -A P48500028
+  queue: -q share
+  walltime: -l walltime=00:30:00
+  resources: -l select=1
 downscaling:
-  queue: premium
-  select: 1:ncpus=36:mem=109GB
+  submit_cmd: sbatch --export=LD_LIBRARY_PATH=
+  queue: -C skylake
+  walltime: -t 30:00
+  resources: -n 1 --cpus-per-task=4 --mem=75G
 reformat_prms_forcings:
-  queue: premium
-  select: 1:ncpus=36:mem=109GB
+  submit_cmd: sbatch
+  queue: -C skylake
+  walltime: -t 30:00
+  resources: -n 1 --cpus-per-task=4 --mem=150G
 run_metsim:
-  queue: premium
-  walltime: 02:00:00
-  select: 1:ncpus=36:mpiprocs=1:ompthreads=1:mem=109GB
+  submit_cmd: sbatch
+  queue: -C skylake
+  walltime: -t 6:00:00
+  resources: -n 1 --cpus-per-task=1 --mem=200G -c 36
 run_vic:
-  queue: premium
-  walltime: 12:00:00
-  select: 1:ncpus=36:mpiprocs=36:ompthreads=1
-run_prms:
-  queue: premium
-  select: 1:ncpus=36
-  walltime: 03:00:00
+  queue: -q premium
+  walltime: -l walltime=12:00:00
+  resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1
 
 domain: /glade/p/ral/hap/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
 
@@ -109,7 +144,7 @@ domain: /glade/p/ral/hap/jhamman/inputdata/domains/domain.vic.conus0.0125deg_new
 # Configuration settings for each method
 DISAGG:
   metsim:
-    executable: /glade/u/home/jhamman/anaconda/envs/storylines/bin/ms
+    executable: /glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms
     template: /glade/u/home/jhamman/projects/storylines/storylines_workflow/templates/metsim.template.cfg
     1440:
       out_vars:
@@ -162,16 +197,16 @@ ROUTING:
 
 OBS_FORCING:
   livneh:
-    data: /glade/p/ral/hap/common_data/Livneh_met/livneh2014.1_16deg/8th/livneh_NAmerExt_15Oct2014.{year}*.nc
+    data: /glade/p/ral/hap/common_data/Livneh_met/livneh2014.1_16deg/8th/livneh_NAmerExt_15Oct2014.*.nc
     variables:
-      lat: latitude
-      lon: longitude
+      lat: lat
+      lon: lon
       prec: Prec
       t_max: Tmax
       t_min: Tmin
       wind: wind
   maurer:
-    data: /glade/p/ral/hap/common_data/Maurer_met/*/nldas_met_update.obs.daily.*.{year}.nc
+    data: /glade/p/ral/hap/common_data/Maurer_met/*/nldas_met_update.obs.daily.*.nc
     variables:
       lat: lat
       lon: lon
@@ -179,7 +214,7 @@ OBS_FORCING:
       t_max: tasmax
       t_min: tasmin
   newman:
-    data: /glade2/scratch2/jhamman/GARD_inputs/newman_ensemble/conus_ens_002.nc
+    data: /gpfs/fs1/scratch/jhamman/GARD_inputs/gmet_ensemble/conus_ens_002.nc
     # mems: [000, 001, 002, 003, 004]  # TODO
     variables:
       lat: lat
@@ -208,8 +243,32 @@ DOWNSCALING:
       prec: pcp
       t_max: t_max
       t_min: t_min
+  gard:
+    data: /gpfs/fs1/scratch/jhamman/GARD_downscaling_20181128/post_processed/gard_output.{dsm}.NCAR_WRF_50km.{gcm}.{scen}.*.dm.qm.nc
+    gcms:  # Mapping from dataset notation to official CMIP5 notation
+      # access13: ACCESS1-3
+      # canesm: CanESM2 -- TODO check on this
+      cesm: CCSM4
+      cnrm: CNRM-CM5
+      gfdl: GFDL-CM3
+      ipsl: IPSL-CM5A-MR
+      # miroc5: MIROC5 -- TODO check on this
+      # mri: MRI-CGCM3 -- TODO check on this
+      # noresm: NorESM1-M
+      # - giss (missing rcp85)
+    variables:
+      lat: lat
+      lon: lon
+      prec: pcp
+      t_max: t_max
+      t_min: t_min
+    methods:
+      - pass_through
+      - analog_regression_2
+      - pure_analog_2
+      - pure_regression_0
   bcsd:
-    data: /glade/p/ral/hap/common_data/BCSD/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.{year}.nc
+    data: /glade/p/ral/hap/common_data/BCSD/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       access1-0: ACCESS1-0
       bcc-csm1-1-m: BCC-CSM1-1-M
@@ -249,8 +308,10 @@ DOWNSCALING:
       t_max: tasmax
       t_min: tasmin
       wind: wind
+    methods:
+      - bcsd
   loca:
-    data: /glade/p/ral/hap/common_data/LOCA/met/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*_{year}0101-{year}1231.LOCA_2016-04-02.8th.nc
+    data: /glade/p/ral/hap/common_data/LOCA/met/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*.LOCA_2016-04-02.8th.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
       ACCESS1-0: ACCESS1-0
       ACCESS1-3: ACCESS1-3
@@ -290,3 +351,5 @@ DOWNSCALING:
       prec: pr
       t_max: tasmax
       t_min: tasmin
+    methods:
+      - loca
