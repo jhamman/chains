@@ -1,10 +1,10 @@
-# Snakemake workflow: storylines-workflow
+# Chains Snakemake workflow
 
 [![Snakemake](https://img.shields.io/badge/snakemake-≥3.12.0-brightgreen.svg)](https://snakemake.bitbucket.io)
-[![Build Status](https://travis-ci.org/snakemake-workflows/storylines_workflow.svg?branch=master)](https://travis-ci.org/snakemake-workflows/storylines_workflow)
 
-This is the template for a new Snakemake workflow. Replace this text with a comprehensive description, covering the purpose and domain.
-Insert your code into the respective folders, i.e. `scripts`, `rules` and `envs`. Define the entry point of the workflow in the `Snakefile` and the main configuration in the `config.yaml` file.
+This is a [Snakemake](https://snakemake.bitbucket.io) workflow for building ensembles of hydrologic model simulations from various climate forcings.
+The workflow implements a "chain-of-models" configuration that includes reading from existing downscaling datasets, meteorological disaggregation, hydrologic modeling, and streamflow routing.
+This work was developed specifically to support the [Quantitative Hydrologic Storylines](https://storylines.readthedocs.io/en/latest/) project.
 
 ## Authors
 
@@ -14,8 +14,8 @@ Insert your code into the respective folders, i.e. `scripts`, `rules` and `envs`
 
 ### Step 1: Install workflow
 
-If you simply want to use this workflow, download and extract the [latest release](https://github.com/snakemake-workflows/storylines_workflow/releases).
-If you intend to modify and further develop this workflow, fork this reposity. Please consider providing any generally applicable modifications via a pull request.
+If you simply want to use this workflow, download and extract the [latest release](https://github.com/jhamman/chains/releases).
+If you intend to modify and further develop this workflow, fork this repository. Please consider providing any generally applicable modifications via a pull request.
 
 In any case, if you use this workflow in a paper, don't forget to give credits to the authors by citing the URL of this repository and, if available, its DOI (see above).
 
@@ -45,4 +45,4 @@ See the [Snakemake documentation](https://snakemake.readthedocs.io) for further 
 
 ## Testing
 
-Tests cases are in the subfolder `.test`. They should be executed via continuous integration with Travis CI.
+Tests cases are in the subfolder `.test`. They should be executed via continuous integration with Travis CI. -- TODO
