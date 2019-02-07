@@ -8,19 +8,19 @@ import numpy as np
 now = tm.ctime(tm.time())
 user = getuser()
 
-attrs = {'pr': {'units': 'in',
+attrs = {'precip_day': {'units': 'in',
                 'long_name': 'precipitation'},
-         'tmin': {'units': 'F',
+         'tmin_day': {'units': 'F',
                   'long_name': 'minimum daily temperature'},
-         'tmax': {'units': 'F',
+         'tmax_day': {'units': 'F',
                   'long_name': 'maximum daily temperature'},
-         'sw': {'units': 'Langley d-1',
+         'swrad_day': {'units': 'Langley d-1',
                 'long_name': 'shortwave flux'}}
 
-encoding = {'pr': {'_FillValue': 0.},
-            'tmin': {'_FillValue': -99.},
-            'tmax': {'_FillValue': -99.},
-            'sw': {'_FillValue': 0.}}
+encoding = {'precip_day': {'_FillValue': 0.},
+            'tmin_day': {'_FillValue': -99.},
+            'tmax_day': {'_FillValue': -99.},
+            'swrad_day': {'_FillValue': 0.}}
 
 
 def read_grid_file(filename):
@@ -48,6 +48,7 @@ def extract_nc(ncin, grid_df, ncout,
     '''
     print('opening %s' % ncin)
     ds = xr.open_mfdataset(ncin)
+    print(ds)
 
     print('subseting and then loading')
     # subset the dataset now
@@ -80,18 +81,18 @@ def extract_nc(ncin, grid_df, ncout,
             raise ValueError('unknown varname: %s' % varname)
 
     # rename variables
-    subset = subset.rename({'prec': 'pr',
-                            't_min': 'tmin',
-                            't_max': 'tmax',
-                            'shortwave': 'sw'})
+    subset = subset.rename({'prec': 'precip_day',
+                            't_min': 'tmin_day',
+                            't_max': 'tmax_day',
+                            'shortwave': 'swrad_day'})
     # reorder dimension
     subset = subset.transpose('time', 'hru')
     # drop some variables
     subset = subset.drop(['lat', 'lon'])
-    subset['pr'] = subset['pr'].astype(np.float32)
-    subset['tmax'] = subset['tmax'].astype(np.float32)
-    subset['tmin'] = subset['tmin'].astype(np.float32)
-    subset['sw'] = subset['sw'].astype(np.float32)
+    subset['precip_day'] = subset['precip_day'].astype(np.float32)
+    subset['tmax_day'] = subset['tmax_day'].astype(np.float32)
+    subset['tmin_day'] = subset['tmin_day'].astype(np.float32)
+    subset['swrad_day'] = subset['swrad_day'].astype(np.float32)
 
     for varname in subset.data_vars:
         subset[varname].attrs = attrs[varname]

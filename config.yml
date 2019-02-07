@@ -281,7 +281,7 @@ DOWNSCALING:
       cnrm-cm5: CNRM-CM5
       csiro-mk3-6-0: CSIRO-Mk3.6.0
       fgoals-g2: FGOALS-g2
-      fio-esm: GFDL-CM3
+      # fio-esm: GFDL-CM3
       gfdl-cm3: GFDL-CM3
       gfdl-esm2g: GFDL-ESM2G
       gfdl-esm2m: GFDL-ESM2M

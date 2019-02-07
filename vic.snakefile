@@ -2,7 +2,7 @@ import os
 import shutil
 
 
-localrules: config_vic,
+localrules: config_vic
 
 
 def vic_init_state(wcs):

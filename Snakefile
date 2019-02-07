@@ -14,7 +14,7 @@ from dask.distributed import Client
 
 from tools.utilities import make_case_readme, log_to_readme
 
-configfile: "/glade/u/home/jhamman/projects/storylines/storylines_workflow/config.yml"
+# configfile: "/glade/u/home/jhamman/projects/storylines/storylines_workflow/config.yml"
 
 
 case_dirs = ['configs', 'disagg_data', 'hydro_data', 'routing_data',
