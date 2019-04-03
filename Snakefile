@@ -87,7 +87,7 @@ DISAGG_LOG = os.path.join(
     CASEDIR, 'logs', 'disagg.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}.%Y%m%d-%H%M%d.log.txt')
 METSIM_STATE = os.path.join(
     DISAGG_DIR, 'state.{gcm}.{scen}.{dsm}.{disagg_method}.nc')
-DISAGG_PREFIX = 'force.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}'
+DISAGG_PREFIX = 'forcing.{gcm}.{scen}.{dsm}.{disagg_method}.{disagg_ts}'
 DISAGG_OUTPUT = os.path.join(DISAGG_DIR,
                              DISAGG_PREFIX + '_{year}0101-{year}1231.nc')
 

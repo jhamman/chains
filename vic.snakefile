@@ -80,13 +80,14 @@ rule run_vic:
         HYDRO_OUTPUT.replace('{model_id}', 'vic').replace(
             '{outstep}', 'monthly'),
         state = VIC_STATE
+    threads: 36
     # benchmark: BENCHMARK
     # log:
     #     NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     run:
         # run VIC
         # TODO: the -n 36 should go away at some point
-        shell("module load intel impi netcdf && mpirun -n 36 {input.vic_exe} -g {input.config}")
+        shell("module load intel impi netcdf && mpirun -n {threads} {input.vic_exe} -g {input.config}")
 
         # rename output files
         for freq, end in [('daily', '.daily.{:4d}-01-01.nc'),

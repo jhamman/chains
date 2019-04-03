@@ -1,9 +1,10 @@
-name: storylines
+name: chains
 channels:
   - conda-forge
 dependencies:
   # Basics
   - python=3.6
+  - pip
   - jupyter
   - jupyterlab
   # Computation
@@ -35,8 +36,8 @@ dependencies:
   - flake8
   - ipython
   - jupyterlab
+  - metsim=>2.0.1
+  - bioconda::snakemake
   - pip:
-    - snakemake
     - git+https://github.com/UW-Hydro/tonic.git
     - git+https://github.com/jhamman/storylines.git
-    - git+https://github.com/UW-Hydro/MetSim.git

@@ -31,8 +31,7 @@ def maybe_make_cfg_list(obj):
 #     output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1981, 'stop': 2005})]
 #     log: NOW.strftime(DISAGG_LOG)
 #     threads: 18
-#     # TODO: remove exe path
-#     shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+#     shell: "ms -s distributed -n {threads} {input.config} > {log} 2>&1"
 
 
 rule run_metsim:
@@ -43,9 +42,8 @@ rule run_metsim:
         state = metsim_state
     output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1955, 'stop': 2005})]
     log: NOW.strftime(DISAGG_LOG)
-    threads: 18
-    # TODO: remove exe path
-    shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+    threads: 36
+    shell: "ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
 
 
 rule run_metsim_rcp:
@@ -56,9 +54,8 @@ rule run_metsim_rcp:
         state = metsim_state
     output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 2006, 'stop': 2099})]
     log: NOW.strftime(DISAGG_LOG)
-    threads: 18
-    # TODO: remove exe path
-    shell: "/glade/u/home/jhamman/miniconda3/envs/storylines/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
+    threads: 36
+    shell: "ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
 
 
 rule config_metsim:

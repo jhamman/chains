@@ -7,6 +7,8 @@ import xarray as xr
 
 import dask
 
+vars_to_drop = ['bounds_longitude', 'bounds_latitude']
+
 def inverse_lookup(d, key):
     for k, v in d.items():
         if v == key:
@@ -40,14 +42,11 @@ def get_downscaling_data(wcs):
 
     return files
 
-
-def cast_to_float(ds):
+def preproc(ds):
+    for var in vars_to_drop:
+        if var in ds:
+            ds = ds.drop(var)
     return ds.astype(np.float32)
-
-def loca_preproc(ds):
-    if 'latitude' in ds.coords:
-        ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
-    return cast_to_float(ds)
 
 
 def process_downscaling_dataset(input_files, output_file, kind, times,
@@ -57,12 +56,8 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
     if like:
         like = xr.open_dataset(like, engine='netcdf4').load()
 
-    if 'loca' in kind.lower() or 'maurer' in kind.lower():
-        preproc = loca_preproc
-    else:
-        preproc = cast_to_float
-
     ds = xr.open_mfdataset(sorted(input_files),
+                           concat_dim='time',
                            preprocess=preproc,
                            engine='netcdf4').load()
 
