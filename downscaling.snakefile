@@ -7,7 +7,11 @@ import xarray as xr
 
 import dask
 
-vars_to_drop = ['bounds_longitude', 'bounds_latitude']
+vars_to_drop = ['bounds_longitude', 'bounds_latitude',
+                'latitude_bnds', 'longitude_bnds', 'nb2']
+
+pre_rename = {'latitude': 'lon', 'longitude': 'lat'}
+
 
 def inverse_lookup(d, key):
     for k, v in d.items():
@@ -17,22 +21,21 @@ def inverse_lookup(d, key):
 
 
 def get_downscaling_data(wcs):
-    dsm_type = config['DOWNSCALING_METHODS'][wcs.dsm]
-    if dsm_type in config['OBS_FORCING']:
+    if wcs.dsm in config['OBS_FORCING']:
         # historical / obs data
-        pattern = config['OBS_FORCING'][dsm_type]['data'] # .format(year=wcs.year)
+        pattern = config['OBS_FORCING'][wcs.dsm]['data'] # .format(year=wcs.year)
     else:
         # downscaling_data
-        gcm = inverse_lookup(config['DOWNSCALING'][dsm_type]['gcms'], wcs.gcm)
+        gcm = inverse_lookup(config['DOWNSCALING'][wcs.dsm]['gcms'], wcs.gcm)
 
-        if dsm_type == 'bcsd' and wcs.scen == 'hist':
+        if wcs.dsm == 'bcsd' and wcs.scen == 'hist':
             scen = 'rcp45'
-        elif dsm_type == 'loca' and wcs.scen == 'hist':
+        elif wcs.dsm == 'loca' and wcs.scen == 'hist':
             scen = 'historical'
         else:
             scen = wcs.scen
 
-        pattern = config['DOWNSCALING'][dsm_type]['data'].format(
+        pattern = config['DOWNSCALING'][wcs.dsm]['data'].format(
             gcm=gcm, scen=scen, dsm=wcs.dsm)
     print(pattern)
     files = sorted(glob.glob(pattern))
@@ -46,6 +49,11 @@ def preproc(ds):
     for var in vars_to_drop:
         if var in ds:
             ds = ds.drop(var)
+    for key, val in pre_rename.items():
+        if key in ds:
+            ds = ds.rename({key: val})
+    lons = ds['lon'].values
+    ds['lon'].values[lons > 180] -= 360.
     return ds.astype(np.float32)
 
 
@@ -63,12 +71,10 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
 
     print('renaming', flush=True)
     if rename:
-        try:
-            ds = ds.rename(
-                {v: k for k, v in rename.items()})[list(rename)]
-        except ValueError:
-            print(ds)
-            raise
+        for key, val in rename.items():
+            if val in ds:
+                ds = ds.rename({val: key})
+
     ds = ds.sel(time=times)
 
     # drop bound variables
@@ -144,9 +150,7 @@ rule downscaling:
         files = get_downscaling_data,
     output:
         temp(DOWNSCALING_DATA)
-    # threads: 36
     log: NOW.strftime(DOWNSCALING_LOG)
-    # benchmark: BENCHMARK
     run:
         dask.config.set(scheduler='single-threaded')
         logging.basicConfig(filename=str(log), level=logging.DEBUG)
@@ -159,11 +163,10 @@ rule downscaling:
         if 'hist' in wildcards.scen:
             start_year = int(start_year) - 1
         times = slice('%s-01-01' % start_year, '%s-12-31' % stop_year)
-        dsm_type = config['DOWNSCALING_METHODS'][wildcards.dsm]
-        if dsm_type in config['DOWNSCALING']:
-            rename = config['DOWNSCALING'][dsm_type]['variables']
+        if wildcards.dsm in config['DOWNSCALING']:
+            rename = config['DOWNSCALING'][wildcards.dsm]['variables']
         else:
-            rename = config['OBS_FORCING'][dsm_type]['variables']
+            rename = config['OBS_FORCING'][wildcards.dsm]['variables']
 
         process_downscaling_dataset(
             input.files, output[0], wildcards.dsm, times,

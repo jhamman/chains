@@ -2,6 +2,10 @@
 localrules: config_metsim
 
 
+OBS_OUTPUT = [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': config['SCEN_YEARS']['obs_hist']['start'], 'stop': config['SCEN_YEARS']['obs_hist']['stop']})]
+HIST_OUTPUT = [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': config['SCEN_YEARS']['hist']['start'], 'stop': config['SCEN_YEARS']['hist']['stop']})]
+RCP_OUTPUT = [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': config['SCEN_YEARS']['rcp85']['start'], 'stop': config['SCEN_YEARS']['rcp85']['stop']})]
+
 def metsim_state(wcs):
     scen = wcs.scen
     if 'rcp' in scen:
@@ -28,7 +32,7 @@ def maybe_make_cfg_list(obj):
 #         config = DISAGG_CONFIG,
 #         forcing = DOWNSCALING_DATA,
 #         state = metsim_state
-#     output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1981, 'stop': 2005})]
+#     output: OBS_OUTPUT
 #     log: NOW.strftime(DISAGG_LOG)
 #     threads: 18
 #     shell: "ms -s distributed -n {threads} {input.config} > {log} 2>&1"
@@ -40,7 +44,7 @@ rule run_metsim:
         config = DISAGG_CONFIG,
         forcing = DOWNSCALING_DATA,
         state = metsim_state
-    output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 1955, 'stop': 2005})]
+    output: HIST_OUTPUT
     log: NOW.strftime(DISAGG_LOG)
     threads: 36
     shell: "ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
@@ -52,7 +56,7 @@ rule run_metsim_rcp:
         config = DISAGG_CONFIG,
         forcing = DOWNSCALING_DATA,
         state = metsim_state
-    output: [DISAGG_OUTPUT.replace('{year}', str(year)) for year in get_year_range({'start': 2006, 'stop': 2099})]
+    output: RCP_OUTPUT
     log: NOW.strftime(DISAGG_LOG)
     threads: 36
     shell: "ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
@@ -76,11 +80,10 @@ rule config_metsim:
 
         time_step = int(wildcards.disagg_ts)
         out_vars = config['DISAGG']['metsim'][time_step]['out_vars']
-        dsm_type = config['DOWNSCALING_METHODS'][wildcards.dsm]
-        if dsm_type in config['DOWNSCALING']:
-            in_vars = config['DOWNSCALING'][dsm_type]['variables']
+        if wildcards.dsm in config['DOWNSCALING']:
+            in_vars = config['DOWNSCALING'][wildcards.dsm]['variables']
         else:
-            in_vars = config['OBS_FORCING'][dsm_type]['variables']
+            in_vars = config['OBS_FORCING'][wildcards.dsm]['variables']
 
         forcing = maybe_make_cfg_list(input.forcing)
         input_state = maybe_make_cfg_list(input.state)
