@@ -14,8 +14,6 @@ from dask.distributed import Client
 
 from tools.utilities import make_case_readme, log_to_readme
 
-# configfile: "/glade/u/home/jhamman/projects/storylines/storylines_workflow/config.yml"
-
 
 case_dirs = ['configs', 'disagg_data', 'hydro_data', 'routing_data',
              'downscaling_data', 'logs']
@@ -47,6 +45,11 @@ def hydro_executable(wcs):
 
 def hydro_template(wcs):
     return config['HYDROLOGY'][wcs.model]['template']
+
+def _expand(*args, **kwargs):
+    print(args)
+    print(kwargs)
+    return expand(*args, **kwargs)
 
 
 # Workflow bookends
@@ -158,7 +161,7 @@ include: "mizuroute.snakefile"
 # readme / logs
 rule readme:
     input:
-        expand(README,
+        _expand(README,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                dsm=config['DOWNSCALING_METHODS'])
 
@@ -185,18 +188,21 @@ def filter_combinator(combinator):
             # in order to accomodate
             # unpredictable wildcard order
             d = dict(wc_comb)
-            if ('model_id' in d) and (d['model_id'] in d['model']):
-                if 'obs' in d['scen']:
-                    yield frozenset(wc_comb)
-                elif d['gcm'] in config['DOWNSCALING'][d['dsm']]['gcms'].values():
-                    yield frozenset(wc_comb)
+
+            # is this combo of gcm/dsm active
+            if d['gcm'] in config['DOWNSCALING'][d['dsm']]['gcms'].values():
+                # if running hydro models
+                if 'model_id' in d:
+                    # if this hydro model matches the model id.
+                    # e.g. model_id=prms_default, model=prms
+                    if d['model_id'] in d['model']:
+                        yield frozenset(wc_comb)
+                    else:
+                        pass
                 else:
-                    pass
+                    yield frozenset(wc_comb)
             else:
-                if d['gcm'] in config['DOWNSCALING'][d['dsm']]['gcms'].values():
-                    yield frozenset(wc_comb)
-                else:
-                    pass
+                pass
     return filtered_combinator
 
 
@@ -205,7 +211,7 @@ filtered_product = filter_combinator(product)
 
 rule config_hydro_models:
     input:
-        expand(HYDRO_CONFIG, filtered_product,
+        _expand(HYDRO_CONFIG, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
                dsm=config['DOWNSCALING_METHODS'],
@@ -227,7 +233,7 @@ rule make_vic_forcings:
 # Hydrologic Models
 rule hydrology_models:
     input:
-        expand(HYDRO_OUTPUT, filtered_product,
+        _expand(HYDRO_OUTPUT, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
                dsm=config['DOWNSCALING_METHODS'],
@@ -236,21 +242,21 @@ rule hydrology_models:
                outstep=['daily', 'monthly'])
 
 
-rule hydrology_models_obs:
-    input:
-        expand(HYDRO_OUTPUT, filtered_product,
-               gcm=['obs'], scen=['obs_hist'],
-               dsm=config['OBS_FORCING'].keys(),
-               disagg_method=config['DISAGG_METHODS'],
-               model=list(config['HYDRO_METHODS'].keys()),
-               model_id=set(config['HYDRO_METHODS'].values()),
-               outstep=['daily', 'monthly'])
+# rule hydrology_models_obs:
+#     input:
+#         _expand(HYDRO_OUTPUT, filtered_product,
+#                gcm=['obs'], scen=['obs_hist'],
+#                dsm=config['OBS_FORCING'].keys(),
+#                disagg_method=config['DISAGG_METHODS'],
+#                model=list(config['HYDRO_METHODS'].keys()),
+#                model_id=set(config['HYDRO_METHODS'].values()),
+#                outstep=['daily', 'monthly'])
 
 
 # Routing Models
 rule config_routing_models:
     input:
-        expand(MIZUROUTE_CONFIG, filtered_product,
+        _expand(MIZUROUTE_CONFIG, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
                dsm=config['DOWNSCALING_METHODS'],
@@ -259,7 +265,7 @@ rule config_routing_models:
 
 rule routing_models:
     input:
-        expand(ROUTE_OUTPUT, filtered_product,
+        _expand(ROUTE_OUTPUT, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                disagg_method=config['DISAGG_METHODS'],
                dsm=config['DOWNSCALING_METHODS'],
@@ -270,7 +276,7 @@ rule routing_models:
 
 # rule routing_models_obs:
 #     input:
-#         expand(ROUTE_OUTPUT, filtered_product,
+#         _expand(ROUTE_OUTPUT, filtered_product,
 #                gcm=['obs'], scen=['obs_hist'],
 #                dsm=config['OBS_FORCING'].keys(),
 #                disagg_method=config['DISAGG_METHODS'],
@@ -282,14 +288,14 @@ rule routing_models:
 # Downscaling methods
 rule downscaling_data:
     input:
-        expand(DOWNSCALING_DATA, filtered_product,
+        _expand(DOWNSCALING_DATA, filtered_product,
                gcm=config['GCMS'], scen=config['SCENARIOS'],
                dsm=config['DOWNSCALING_METHODS'])
 
 # Disaggregation methods
 rule disagg_configs:
     input:
-        expand(DISAGG_CONFIG, filtered_product,
+        _expand(DISAGG_CONFIG, filtered_product,
                 gcm=config['GCMS'], scen=config['SCENARIOS'],
                 dsm=config['DOWNSCALING_METHODS'],
                 disagg_ts=[60, 1440],
@@ -297,7 +303,7 @@ rule disagg_configs:
 
 rule disagg_configs_obs:
     input:
-        expand(DISAGG_CONFIG,
+        _expand(DISAGG_CONFIG,
                gcm=['obs'], scen=['obs_hist'],
                dsm=config['OBS_FORCING'].keys(),
                disagg_ts=[60, 1440],
@@ -314,14 +320,14 @@ rule disagg_methods:
          for scen in config['SCENARIOS']]
 
 
-# rule disagg_methods_obs:
-#     input:
-#         expand(DISAGG_OUTPUT,
-#                gcm=['obs'], scen=['obs_hist'],
-#                dsm=config['OBS_FORCING'].keys(),
-#                disagg_ts=[60, 1440],
-#                disagg_method=config['DISAGG_METHODS'],
-#                year=get_year_range(config['SCEN_YEARS']['obs_hist']))
+rule disagg_methods_obs:
+    input:
+        _expand(DISAGG_OUTPUT,
+               gcm=['obs'], scen=['obs_hist'],
+               dsm=config['OBS_FORCING'].keys(),
+               disagg_ts=[60, 1440],
+               disagg_method=config['DISAGG_METHODS'],
+               year=get_year_range(config['SCEN_YEARS']['obs_hist']))
 
 
 rule dummy_state:

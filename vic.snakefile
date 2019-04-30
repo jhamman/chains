@@ -90,7 +90,7 @@ rule run_vic:
         if 'prerun_cmd' is not None:
             shell(prerun_cmd)
         # TODO: replace 12 {threads}
-        shell("mpirun -n 12 {input.vic_exe} -g {input.config}")
+        shell(prerun_cmd + " && " + "mpirun -n 12 {input.vic_exe} -g {input.config}")
 
         # rename output files
         for freq, end in [('daily', '.daily.{:4d}-01-01.nc'),

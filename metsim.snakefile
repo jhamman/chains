@@ -10,8 +10,8 @@ def metsim_state(wcs):
     scen = wcs.scen
     if 'rcp' in scen:
         scen = 'hist'
-    if wcs.dsm == 'bcsd' and scen == 'hist':
-        scen = 'rcp45'
+    # if wcs.dsm == 'bcsd' and scen == 'hist':
+    #     scen = 'rcp45'
 
     state = DOWNSCALING_DATA.format(dsm=wcs.dsm, gcm=wcs.gcm, scen=scen)
 
@@ -36,7 +36,7 @@ def maybe_make_cfg_list(obj):
 #     log: NOW.strftime(DISAGG_LOG)
 #     threads: 18
 #     shell: "ms -s distributed -n {threads} {input.config} > {log} 2>&1"
-
+ 
 
 rule run_metsim:
     input:

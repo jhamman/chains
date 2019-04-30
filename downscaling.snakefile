@@ -10,7 +10,7 @@ import dask
 vars_to_drop = ['bounds_longitude', 'bounds_latitude',
                 'latitude_bnds', 'longitude_bnds', 'nb2']
 
-pre_rename = {'latitude': 'lon', 'longitude': 'lat'}
+pre_rename = {'latitude': 'lat', 'longitude': 'lon'}
 
 
 def inverse_lookup(d, key):
@@ -52,6 +52,7 @@ def preproc(ds):
     for key, val in pre_rename.items():
         if key in ds:
             ds = ds.rename({key: val})
+
     lons = ds['lon'].values
     ds['lon'].values[lons > 180] -= 360.
     return ds.astype(np.float32)
@@ -62,6 +63,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
 
     variables = ['prec', 'wind', 't_max', 't_min']
     if like:
+        print('like %s' % like)
         like = xr.open_dataset(like, engine='netcdf4').load()
 
     ds = xr.open_mfdataset(sorted(input_files),
@@ -83,9 +85,10 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         if v in ds or v in ds.coords:
             drops.append(v)
     ds = ds.drop(drops)
-    print('reindexing', flush=True)
+    print('reindexing like %s' % like, flush=True)
+
     if like:
-        ds = ds.reindex_like(like, method='nearest')
+        ds = ds.reindex_like(like, method='nearest', tolerance=0.001)
 
     if 'wind' not in ds:
         ds['wind'] = xr.full_like(ds['prec'], DEFAULT_WIND)
@@ -101,6 +104,12 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         for v in ['t_max', 't_min']:
             ds[v] = ds[v] - KELVIN
             ds[v].attrs['units'] = 'C'
+    if 't_max' not in ds:
+        print('calculating t_max')
+        ds['t_max'] = ds['t_mean'] + 0.5 * ds['t_range']
+    if 't_min' not in ds:
+        print('calculating t_min')
+        ds['t_min'] = ds['t_mean'] - 0.5 * ds['t_range']
 
     # quality control checks
     ds['t_max'] = ds['t_max'].where(ds['t_max'] > ds['t_min'],
@@ -109,8 +118,8 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
     ds['wind'] = ds['wind'].where(ds['wind'] > 0, 0.)
 
     print('masking', flush=True)
-    if like and 'mask' in like:
-        ds = ds.where(like['mask'])
+    # if like and 'mask' in like:
+    #     ds = ds.where(like['mask'])
 
     ds = ds[variables]
 
@@ -120,13 +129,13 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
 
     # TODO: save the original attributes and put them back
 
-    print('filling missing days', flush=True)
     # make sure time index in dataset cover the full period
     times = ds.indexes['time']
     start_year, stop_year = times.year[0], times.year[-1]
     dates = pd.date_range(start=f'{start_year}-01-01',
                           end=f'{stop_year}-12-31', freq='D')
     if ds.dims['time'] != len(dates):
+        print('filling missing days', flush=True)
         # fill in missing days at the end or begining of the record
         # removed: reindex(time=dates, method='ffill', copy=False)
         if isinstance(ds.indexes['time'], xr.CFTimeIndex):
@@ -139,7 +148,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         for var in variables:
             encoding[var] = dict(chunksizes=chunksizes)
 
-    print('writing', flush=True)
+    print('writing %s:\n%s' % (output_file, ds), flush=True)
     # TODO, update time encoding to use common units for all files
     ds.to_netcdf(output_file, engine='netcdf4', encoding=encoding)
 
