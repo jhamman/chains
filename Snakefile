@@ -47,8 +47,9 @@ def hydro_template(wcs):
     return config['HYDROLOGY'][wcs.model]['template']
 
 def _expand(*args, **kwargs):
-    print(args)
-    print(kwargs)
+    if config.get('verbose'):
+        print(args)
+        print(kwargs)
     return expand(*args, **kwargs)
 
 

@@ -37,7 +37,6 @@ def get_downscaling_data(wcs):
 
         pattern = config['DOWNSCALING'][wcs.dsm]['data'].format(
             gcm=gcm, scen=scen, dsm=wcs.dsm)
-    print(pattern)
     files = sorted(glob.glob(pattern))
 
     if not files:
@@ -125,7 +124,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
 
     print('loading %0.1fGB' % (ds.nbytes / 1e9), flush=True)
     print(ds, flush=True)
-    ds = ds.load().transpose('time', 'lat', 'lon')
+    ds = ds.transpose('time', 'lat', 'lon')  # .load()
 
     # TODO: save the original attributes and put them back
 
