@@ -1,12 +1,19 @@
+# snakemake hydrology_models --local-cores 1 --configfile config.yml --cluster-config ./config.yml --cluster "{cluster.submit_cmd} {cluster.walltime} {cluster.resources} {cluster.account} {cluster.queue}" --jobname {rulename}.{jobid}.sh --latency-wait 30 -p --jobs 100 --jobscript jobscript.sh --restart-times 1 --keep-going --ignore-incomplete --notemp --max-jobs-per-second 2
 GCMS:
-  - CNRM-CM5
+  - ACCESS1-3
+  - CanESM2
+  - CCSM4
+  - CESM1-BGC
+  - CESM1-CAM5
   - GFDL-CM3
+  - MIROC5
+  - MRI-CGCM3
+  - NorESM1-M
 SCENARIOS:
   - hist
   - rcp45
   - rcp85
 DOWNSCALING_METHODS:
-  - bcsd
   - loca
   - icar
 DISAGG_METHODS:
@@ -19,23 +26,35 @@ ROUTING_METHODS:
   - mizuroute
 SCEN_YEARS:
   hist:
-    start: 2000
+    start: 1955
     stop: 2005
   rcp45:
     start: 2006
-    stop: 2010
+    stop: 2098
   rcp85:
     start: 2006
-    stop: 2010
+    stop: 2098
   obs_hist:
     start: 2000
     stop: 2005
+  # hist:
+  #   start: 2000
+  #   stop: 2005
+  # rcp45:
+  #   start: 2006
+  #   stop: 2010
+  # rcp85:
+  #   start: 2006
+  #   stop: 2010
+  # obs_hist:
+  #   start: 2000
+  #   stop: 2005
 DISAGG_CHUNKS:
   lat: 1
-  lon: 464
+  lon: 112
 
 machine: cheyenne_dav
-workdir: /gpfs/flash/jhamman/storylines_test_full/
+workdir: /gpfs/flash/jhamman/storylines_production_05292019/
 __default__:
   submit_cmd: qsub -j oe
   account: -A P48500028
@@ -49,18 +68,18 @@ downscaling:
   resources: -n 1 --cpus-per-task=4 --mem=75G
 run_metsim:
   queue: -q economy
-  walltime: -l walltime=2:00:00
-  resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1
+  walltime: -l walltime=4:00:00
+  resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1:mem=109GB
 run_metsim_rcp:
   queue: -q economy
-  walltime: -l walltime=4:00:00
-  resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1
+  walltime: -l walltime=5:00:00
+  resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1:mem=109GB
 run_vic:
   queue: -q economy
   walltime: -l walltime=12:00:00
   resources: -l select=1:ncpus=36:mpiprocs=36:ompthreads=1
 
-domain: /glade/p/ral/hap/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman.20180326.nc
+domain: /glade/p/ral/hap/jhamman/inputdata/domains/domain.vic.conus0.0125deg_newman_bcsd.20190516.nc
 
 # Configuration settings for each method
 DISAGG:
@@ -141,8 +160,15 @@ DOWNSCALING:
   icar:
     data: /glade/p/ral/hap/trude/conus_icar/qm_data/{gcm}_{scen}_exl_conv.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
+      access13: ACCESS1-3
+      canesm: CanESM2
+      cesm: CCSM4
       cnrm: CNRM-CM5
       gfdl: GFDL-CM3
+      ipsl: IPSL-CM5A-MR
+      miroc5: MIROC5
+      mri: MRI-CGCM3
+      noresm: NorESM1-M
     variables:
       lat: lat
       lon: lon
@@ -150,10 +176,37 @@ DOWNSCALING:
       t_max: t_max
       t_min: t_min
   bcsd:
-    data: /glade/p/ral/hap/common_data/BCSD/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*.nc
+    data: /glade/p/ral/hap/common_data/BCSD/BCSD_daily_forc_nc/{gcm}_{scen}_*/conus_c5.{gcm}_{scen}_*.daily.*{year}.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
+      access1-0: ACCESS1-0
+      bcc-csm1-1-m: BCC-CSM1-1-M
+      bcc-csm1-1: BCC-CSM1-1
+      canesm2: CanESM2
+      ccsm4: CCSM4
+      cesm1-bgc: CESM1-BGC
+      cesm1-cam5: CESM1-CAM5
+      cmcc-cm: CMCC-CM
       cnrm-cm5: CNRM-CM5
+      csiro-mk3-6-0: CSIRO-Mk3.6.0
+      fgoals-g2: FGOALS-g2
       gfdl-cm3: GFDL-CM3
+      gfdl-esm2g: GFDL-ESM2G
+      gfdl-esm2m: GFDL-ESM2M
+      giss-e2-h-cc: GISS-E2-H-CC
+      giss-e2-r-cc: GISS-E2-R-CC
+      giss-e2-r: GISS-E2-R
+      hadgem2-ao: HadGEM2-AO
+      hadgem2-cc: HadGEM2-CC
+      hadgem2-es: HadGEM2-ES
+      inmcm4: INM-CM4
+      ipsl-cm5b-lr: IPSL-CM5A-LR
+      miroc5: MIROC5
+      miroc-esm-chem: MIROC-ESM-CHEM
+      miroc-esm: MIROC-ESM
+      mpi-esm-lr: MPI-ESM-LR
+      mpi-esm-mr: MPI-ESM-MR
+      mri-cgcm3: MRI-CGCM3
+      noresm1-m: NorESM1-M
     variables:
       lat: latitude
       lon: longitude
@@ -162,10 +215,18 @@ DOWNSCALING:
       t_min: tasmin
       wind: wind
   loca:
-    data: /glade/p/ral/hap/common_data/LOCA/met/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*.LOCA_2016-04-02.8th.nc
+    data: /glade/p/ral/hap/common_data/LOCA/met/{gcm}/8th/{scen}/*/*/*_day_{gcm}_{scen}_*{year}0101-{year}1231.LOCA_2016-04-02.8th.nc
     gcms:  # Mapping from dataset notation to official CMIP5 notation
+      ACCESS1-0: ACCESS1-0
+      ACCESS1-3: ACCESS1-3
+      CanESM2: CanESM2
+      CCSM4: CCSM4
+      CESM1-BGC: CESM1-BGC
       CNRM-CM5: CNRM-CM5
       GFDL-CM3: GFDL-CM3
+      MIROC5: MIROC5
+      MRI-CGCM3: MRI-CGCM3
+      NorESM1-M: NorESM1-M
     variables:
       lat: lat
       lon: lon

@@ -21,7 +21,7 @@ rule rename_hydro_forcings_for_vic:
     input: DISAGG_OUTPUT
     output: temp(VIC_FORCING)
     run:
-        shell("ncks --no_tmp_fl --cnk_dmn time,1 --cnk_dmn lat,224 --cnk_dmn lon,464 {input} {output}")
+        shell("ncks --ovr --no_tmp_fl --cnk_dmn time,1 --cnk_dmn lat,224 --cnk_dmn lon,464 {input} {output}")
 
 
 rule config_vic:
@@ -90,7 +90,7 @@ rule run_vic:
         if 'prerun_cmd' is not None:
             shell(prerun_cmd)
         # TODO: replace 12 {threads}
-        shell(prerun_cmd + " && " + "mpirun -n 12 {input.vic_exe} -g {input.config}")
+        shell(prerun_cmd + " && " + "mpirun -n {threads} {input.vic_exe} -g {input.config}")
 
         # rename output files
         for freq, end in [('daily', '.daily.{:4d}-01-01.nc'),

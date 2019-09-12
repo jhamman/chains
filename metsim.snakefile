@@ -46,8 +46,8 @@ rule run_metsim:
         state = metsim_state
     output: HIST_OUTPUT
     log: NOW.strftime(DISAGG_LOG)
-    threads: 36
-    shell: "/glade/u/home/jhamman/miniconda3/envs/chains/bin/ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
+    threads: 18
+    shell: "/glade/u/home/jhamman/miniconda3/envs/chains/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
 
 
 rule run_metsim_rcp:
@@ -58,8 +58,8 @@ rule run_metsim_rcp:
         state = metsim_state
     output: RCP_OUTPUT
     log: NOW.strftime(DISAGG_LOG)
-    threads: 36
-    shell: " /glade/u/home/jhamman/miniconda3/envs/chains/bin/ms -v -s distributed -n {threads} {input.config} > {log} 2>&1"
+    threads: 18
+    shell: " /glade/u/home/jhamman/miniconda3/envs/chains/bin/ms -s distributed -n {threads} {input.config} > {log} 2>&1"
 
 
 rule config_metsim:

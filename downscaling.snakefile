@@ -21,12 +21,22 @@ def inverse_lookup(d, key):
 
 
 def get_downscaling_data(wcs):
+    if 'hist' in wcs.scen:
+        # get one year before start of simulation for metsim
+        start_offset = -1
+    else:
+        start_offset = 0
+    years = get_year_range(config['SCEN_YEARS'][wcs.scen],
+                           start_offset=start_offset)
+
     if wcs.dsm in config['OBS_FORCING']:
         # historical / obs data
-        pattern = config['OBS_FORCING'][wcs.dsm]['data'] # .format(year=wcs.year)
+        template = config['OBS_FORCING'][wcs.dsm]['data']
+        scen = wcs.scen
     else:
         # downscaling_data
         gcm = inverse_lookup(config['DOWNSCALING'][wcs.dsm]['gcms'], wcs.gcm)
+        template = config['DOWNSCALING'][wcs.dsm]['data']
 
         if wcs.dsm == 'bcsd' and wcs.scen == 'hist':
             scen = 'rcp45'
@@ -35,12 +45,25 @@ def get_downscaling_data(wcs):
         else:
             scen = wcs.scen
 
-        pattern = config['DOWNSCALING'][wcs.dsm]['data'].format(
-            gcm=gcm, scen=scen, dsm=wcs.dsm)
-    files = sorted(glob.glob(pattern))
+    # get a pattern without wildcards (could still have glob patterns)
+    patterns = set([template.format(gcm=gcm, scen=scen, dsm=wcs.dsm, year=year)
+                    for year in years])
 
-    if not files:
-        raise RuntimeError('Failed to find any files for pattern %s' % pattern)
+    # get actual filepaths
+    files = []
+    for pattern in patterns:
+        files.extend(glob.glob(pattern))
+    files.sort()
+
+    # make sure all these files exist
+    missing = []
+    for file in files:
+        if not os.path.isfile(file):
+            missing.append(file)
+    if missing:
+        raise RuntimeError(
+            'Failed to find any files for template %s. '
+            'Missing: %s' % (pattern, '\n'.join(missing)))
 
     return files
 
@@ -66,6 +89,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         like = xr.open_dataset(like, engine='netcdf4').load()
 
     ds = xr.open_mfdataset(sorted(input_files),
+                           combine='by_coords',
                            concat_dim='time',
                            preprocess=preproc,
                            engine='netcdf4').load()
@@ -120,7 +144,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
     # if like and 'mask' in like:
     #     ds = ds.where(like['mask'])
 
-    ds = ds[variables]
+    ds = ds[variables].astype(np.float32)
 
     print('loading %0.1fGB' % (ds.nbytes / 1e9), flush=True)
     print(ds, flush=True)
@@ -157,7 +181,7 @@ rule downscaling:
         readme = README,
         files = get_downscaling_data,
     output:
-        temp(DOWNSCALING_DATA)
+        DOWNSCALING_DATA
     log: NOW.strftime(DOWNSCALING_LOG)
     run:
         dask.config.set(scheduler='single-threaded')

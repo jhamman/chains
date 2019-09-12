@@ -55,7 +55,7 @@ def extract_nc(ncin, grid_df, ncout,
     lats = xr.Variable('hru', grid_df['lat'])
     lons = xr.Variable('hru', grid_df['lon'])
     print(lats, lons, ds[varnames], flush=True)
-    subset = ds[varnames].sel(lat=lats, lon=lons)
+    subset = ds[varnames].sel(lat=lats, lon=lons, method='nearest')
 
     subset.coords['hru'] = xr.Variable(
         'hru', np.arange(1, len(grid_df['hru']) + 1))

@@ -19,8 +19,8 @@ case_dirs = ['configs', 'disagg_data', 'hydro_data', 'routing_data',
              'downscaling_data', 'logs']
 
 
-def get_year_range(years):
-    return list(range(years['start'], years['stop'] + 1))
+def get_year_range(years, start_offset=0):
+    return list(range(years['start'] + start_offset, years['stop'] + 1))
 
 
 def hydro_forcings(wcs):
