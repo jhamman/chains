@@ -20,8 +20,8 @@ def vic_init_state(wcs):
 rule rename_hydro_forcings_for_vic:
     input: DISAGG_OUTPUT
     output: temp(VIC_FORCING)
-    shell:
-        "module load nco && time ncks --no_tmp_fl --cnk_dmn time,1 --cnk_dmn lat,224 --cnk_dmn lon,464 {input} {output}"
+    run:
+        shell("ncks --ovr --no_tmp_fl --cnk_dmn time,1 --cnk_dmn lat,224 --cnk_dmn lon,464 {input} {output}")
 
 
 rule config_vic:
@@ -80,13 +80,17 @@ rule run_vic:
         HYDRO_OUTPUT.replace('{model_id}', 'vic').replace(
             '{outstep}', 'monthly'),
         state = VIC_STATE
+    threads: 36
     # benchmark: BENCHMARK
     # log:
     #     NOW.strftime(HYDRO_LOG.replace('{model_id}', 'vic'))
     run:
         # run VIC
-        # TODO: the -n 36 should go away at some point
-        shell("module load intel impi netcdf && mpirun -n 36 {input.vic_exe} -g {input.config}")
+        prerun_cmd = config['HYDROLOGY'][wildcards.model].get('prerun_cmd')
+        if 'prerun_cmd' is not None:
+            shell(prerun_cmd)
+        # TODO: replace 12 {threads}
+        shell(prerun_cmd + " && " + "mpirun -n {threads} {input.vic_exe} -g {input.config}")
 
         # rename output files
         for freq, end in [('daily', '.daily.{:4d}-01-01.nc'),

@@ -49,7 +49,7 @@ runoff 1
 rule reformat_prms_forcings:
     input:
         prms_forcings_from_disagg,
-    output: PRMS_FORCINGS
+    output: temp(PRMS_FORCINGS)
     # benchmark: BENCHMARK
     run:
         from tools.prms import read_grid_file, extract_nc

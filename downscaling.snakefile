@@ -7,6 +7,12 @@ import xarray as xr
 
 import dask
 
+vars_to_drop = ['bounds_longitude', 'bounds_latitude',
+                'latitude_bnds', 'longitude_bnds', 'nb2']
+
+pre_rename = {'latitude': 'lat', 'longitude': 'lon'}
+
+
 def inverse_lookup(d, key):
     for k, v in d.items():
         if v == key:
@@ -15,39 +21,63 @@ def inverse_lookup(d, key):
 
 
 def get_downscaling_data(wcs):
-    dsm_type = config['DOWNSCALING_METHODS'][wcs.dsm]
-    if dsm_type in config['OBS_FORCING']:
+    if 'hist' in wcs.scen:
+        # get one year before start of simulation for metsim
+        start_offset = -1
+    else:
+        start_offset = 0
+    years = get_year_range(config['SCEN_YEARS'][wcs.scen],
+                           start_offset=start_offset)
+
+    if wcs.dsm in config['OBS_FORCING']:
         # historical / obs data
-        pattern = config['OBS_FORCING'][dsm_type]['data'] # .format(year=wcs.year)
+        template = config['OBS_FORCING'][wcs.dsm]['data']
+        scen = wcs.scen
     else:
         # downscaling_data
-        gcm = inverse_lookup(config['DOWNSCALING'][dsm_type]['gcms'], wcs.gcm)
+        gcm = inverse_lookup(config['DOWNSCALING'][wcs.dsm]['gcms'], wcs.gcm)
+        template = config['DOWNSCALING'][wcs.dsm]['data']
 
-        if dsm_type == 'bcsd' and wcs.scen == 'hist':
+        if wcs.dsm == 'bcsd' and wcs.scen == 'hist':
             scen = 'rcp45'
-        elif dsm_type == 'loca' and wcs.scen == 'hist':
+        elif wcs.dsm == 'loca' and wcs.scen == 'hist':
             scen = 'historical'
         else:
             scen = wcs.scen
 
-        pattern = config['DOWNSCALING'][dsm_type]['data'].format(
-            gcm=gcm, scen=scen, dsm=wcs.dsm)
-    print(pattern)
-    files = sorted(glob.glob(pattern))
+    # get a pattern without wildcards (could still have glob patterns)
+    patterns = set([template.format(gcm=gcm, scen=scen, dsm=wcs.dsm, year=year)
+                    for year in years])
 
-    if not files:
-        raise RuntimeError('Failed to find any files for pattern %s' % pattern)
+    # get actual filepaths
+    files = []
+    for pattern in patterns:
+        files.extend(glob.glob(pattern))
+    files.sort()
+
+    # make sure all these files exist
+    missing = []
+    for file in files:
+        if not os.path.isfile(file):
+            missing.append(file)
+    if missing:
+        raise RuntimeError(
+            'Failed to find any files for template %s. '
+            'Missing: %s' % (pattern, '\n'.join(missing)))
 
     return files
 
+def preproc(ds):
+    for var in vars_to_drop:
+        if var in ds:
+            ds = ds.drop(var)
+    for key, val in pre_rename.items():
+        if key in ds:
+            ds = ds.rename({key: val})
 
-def cast_to_float(ds):
+    lons = ds['lon'].values
+    ds['lon'].values[lons > 180] -= 360.
     return ds.astype(np.float32)
-
-def loca_preproc(ds):
-    if 'latitude' in ds.coords:
-        ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
-    return cast_to_float(ds)
 
 
 def process_downscaling_dataset(input_files, output_file, kind, times,
@@ -55,25 +85,21 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
 
     variables = ['prec', 'wind', 't_max', 't_min']
     if like:
+        print('like %s' % like)
         like = xr.open_dataset(like, engine='netcdf4').load()
 
-    if 'loca' in kind.lower() or 'maurer' in kind.lower():
-        preproc = loca_preproc
-    else:
-        preproc = cast_to_float
-
     ds = xr.open_mfdataset(sorted(input_files),
+                           combine='by_coords',
+                           concat_dim='time',
                            preprocess=preproc,
                            engine='netcdf4').load()
 
     print('renaming', flush=True)
     if rename:
-        try:
-            ds = ds.rename(
-                {v: k for k, v in rename.items()})[list(rename)]
-        except ValueError:
-            print(ds)
-            raise
+        for key, val in rename.items():
+            if val in ds:
+                ds = ds.rename({val: key})
+
     ds = ds.sel(time=times)
 
     # drop bound variables
@@ -82,9 +108,10 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         if v in ds or v in ds.coords:
             drops.append(v)
     ds = ds.drop(drops)
-    print('reindexing', flush=True)
+    print('reindexing like %s' % like, flush=True)
+
     if like:
-        ds = ds.reindex_like(like, method='nearest')
+        ds = ds.reindex_like(like, method='nearest', tolerance=0.001)
 
     if 'wind' not in ds:
         ds['wind'] = xr.full_like(ds['prec'], DEFAULT_WIND)
@@ -100,6 +127,12 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         for v in ['t_max', 't_min']:
             ds[v] = ds[v] - KELVIN
             ds[v].attrs['units'] = 'C'
+    if 't_max' not in ds:
+        print('calculating t_max')
+        ds['t_max'] = ds['t_mean'] + 0.5 * ds['t_range']
+    if 't_min' not in ds:
+        print('calculating t_min')
+        ds['t_min'] = ds['t_mean'] - 0.5 * ds['t_range']
 
     # quality control checks
     ds['t_max'] = ds['t_max'].where(ds['t_max'] > ds['t_min'],
@@ -108,24 +141,24 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
     ds['wind'] = ds['wind'].where(ds['wind'] > 0, 0.)
 
     print('masking', flush=True)
-    if like and 'mask' in like:
-        ds = ds.where(like['mask'])
+    # if like and 'mask' in like:
+    #     ds = ds.where(like['mask'])
 
-    ds = ds[variables]
+    ds = ds[variables].astype(np.float32)
 
     print('loading %0.1fGB' % (ds.nbytes / 1e9), flush=True)
     print(ds, flush=True)
-    ds = ds.load().transpose('time', 'lat', 'lon')
+    ds = ds.transpose('time', 'lat', 'lon')  # .load()
 
     # TODO: save the original attributes and put them back
 
-    print('filling missing days', flush=True)
     # make sure time index in dataset cover the full period
     times = ds.indexes['time']
     start_year, stop_year = times.year[0], times.year[-1]
     dates = pd.date_range(start=f'{start_year}-01-01',
                           end=f'{stop_year}-12-31', freq='D')
     if ds.dims['time'] != len(dates):
+        print('filling missing days', flush=True)
         # fill in missing days at the end or begining of the record
         # removed: reindex(time=dates, method='ffill', copy=False)
         if isinstance(ds.indexes['time'], xr.CFTimeIndex):
@@ -138,7 +171,7 @@ def process_downscaling_dataset(input_files, output_file, kind, times,
         for var in variables:
             encoding[var] = dict(chunksizes=chunksizes)
 
-    print('writing', flush=True)
+    print('writing %s:\n%s' % (output_file, ds), flush=True)
     # TODO, update time encoding to use common units for all files
     ds.to_netcdf(output_file, engine='netcdf4', encoding=encoding)
 
@@ -148,10 +181,8 @@ rule downscaling:
         readme = README,
         files = get_downscaling_data,
     output:
-        temp(DOWNSCALING_DATA)
-    # threads: 36
+        DOWNSCALING_DATA
     log: NOW.strftime(DOWNSCALING_LOG)
-    # benchmark: BENCHMARK
     run:
         dask.config.set(scheduler='single-threaded')
         logging.basicConfig(filename=str(log), level=logging.DEBUG)
@@ -164,11 +195,10 @@ rule downscaling:
         if 'hist' in wildcards.scen:
             start_year = int(start_year) - 1
         times = slice('%s-01-01' % start_year, '%s-12-31' % stop_year)
-        dsm_type = config['DOWNSCALING_METHODS'][wildcards.dsm]
-        if dsm_type in config['DOWNSCALING']:
-            rename = config['DOWNSCALING'][dsm_type]['variables']
+        if wildcards.dsm in config['DOWNSCALING']:
+            rename = config['DOWNSCALING'][wildcards.dsm]['variables']
         else:
-            rename = config['OBS_FORCING'][dsm_type]['variables']
+            rename = config['OBS_FORCING'][wildcards.dsm]['variables']
 
         process_downscaling_dataset(
             input.files, output[0], wildcards.dsm, times,
